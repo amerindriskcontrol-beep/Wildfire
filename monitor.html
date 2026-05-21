@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AMERIND Wildfire Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f7f5f0;--surface:#fff;--border:#e2ddd6;--text:#1a1814;--muted:#6b6560;
+  --accent:#c4420a;--accent-light:#fdf0eb;--radius:8px;--radius-lg:14px;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+  --critical:#8b0000;--high:#c4420a;--moderate:#b07a00;--low:#2d6a2d;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;}
+header{background:var(--text);color:#fff;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-mark{width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:500;color:#fff;}
+.logo-text{font-size:15px;font-weight:500;}
+.logo-sub{font-size:11px;color:rgba(255,255,255,0.5);margin-top:1px;}
+.nav{display:flex;gap:4px;}
+.nav-btn{padding:7px 14px;font-size:13px;font-weight:500;border:none;border-radius:6px;cursor:pointer;background:transparent;color:rgba(255,255,255,0.6);transition:all 0.15s;}
+.nav-btn:hover{background:rgba(255,255,255,0.1);color:#fff;}
+.nav-btn.active{background:var(--accent);color:#fff;}
+.container{max-width:1200px;margin:0 auto;padding:28px 24px;}
+.page{display:none;}
+.page.active{display:block;}
+
+/* Stats row */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;}
+.stat-val{font-family:var(--mono);font-size:28px;font-weight:500;}
+.stat-label{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.06em;}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+
+/* Alert inbox */
+.alert-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.alert-filters{display:flex;gap:8px;}
+.filter-btn{padding:6px 14px;font-size:12px;font-weight:500;border:1px solid var(--border);border-radius:20px;cursor:pointer;background:var(--surface);color:var(--muted);transition:all 0.15s;}
+.filter-btn.active{background:var(--text);color:#fff;border-color:var(--text);}
+.alert-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px;display:flex;gap:16px;align-items:flex-start;}
+.alert-card.critical{border-left:4px solid var(--critical);}
+.alert-card.high{border-left:4px solid var(--high);}
+.alert-card.moderate{border-left:4px solid var(--moderate);}
+.alert-card.acknowledged{opacity:0.5;}
+.severity-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;text-transform:uppercase;white-space:nowrap;}
+.severity-badge.critical{background:#fff0f0;color:var(--critical);}
+.severity-badge.high{background:var(--accent-light);color:var(--high);}
+.severity-badge.moderate{background:#fffbf0;color:var(--moderate);}
+.alert-main{flex:1;}
+.alert-title{font-size:14px;font-weight:500;margin-bottom:3px;}
+.alert-addr{font-size:12px;color:var(--muted);}
+.alert-body{font-size:12px;color:var(--text);margin-top:6px;line-height:1.5;}
+.alert-meta{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;}
+.alert-meta-item{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.alert-meta-item span{color:var(--text);font-weight:500;}
+.alert-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+.btn{padding:8px 16px;font-family:var(--sans);font-size:13px;font-weight:500;border:none;border-radius:var(--radius);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#a83608;}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border);}
+.btn-outline:hover{background:var(--bg);}
+.btn-sm{padding:5px 12px;font-size:12px;}
+.btn-danger{background:#fff0f0;color:var(--critical);border:1px solid #ffcccc;}
+
+/* Upload section */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:40px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--surface);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-light);}
+.upload-zone-icon{font-size:32px;margin-bottom:12px;}
+.upload-zone-text{font-size:15px;font-weight:500;margin-bottom:6px;}
+.upload-zone-sub{font-size:12px;color:var(--muted);}
+.col-map-row{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+.col-map-label{font-size:12px;font-weight:500;width:140px;flex-shrink:0;}
+.col-map-select{flex:1;padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);}
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;background:var(--accent);border-radius:4px;transition:width 0.3s;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;}
+.card-title{font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+.form-row{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.form-label{font-size:12px;font-weight:500;width:180px;flex-shrink:0;}
+.form-input{flex:1;padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);min-width:0;}
+.form-input:focus{outline:none;border-color:var(--accent);}
+.toggle{position:relative;display:inline-block;width:36px;height:20px;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:#ccc;border-radius:20px;cursor:pointer;transition:0.2s;}
+.toggle-slider:before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:0.2s;}
+.toggle input:checked+.toggle-slider{background:var(--accent);}
+.toggle input:checked+.toggle-slider:before{transform:translateX(16px);}
+.recipient-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border);}
+.recipient-row:last-child{border-bottom:none;}
+.run-log-item{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:12px;}
+.run-log-item:last-child{border-bottom:none;}
+.run-status{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:8px;}
+.run-status.complete{background:#f0fff0;color:#2d6a2d;}
+.run-status.error{background:#fff0f0;color:#8b0000;}
+.run-status.running{background:#fff8f0;color:#b07a00;}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;}
+.empty-icon{font-size:32px;margin-bottom:8px;}
+table.portfolio-table{width:100%;border-collapse:collapse;font-size:12px;}
+table.portfolio-table th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border);}
+table.portfolio-table td{padding:8px 12px;border-bottom:0.5px solid var(--border);}
+table.portfolio-table tr:hover td{background:var(--bg);}
+.conf-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:500;}
+.conf-high{background:#f0fff0;color:#2d6a2d;}
+.conf-med{background:#fffbf0;color:#b07a00;}
+.conf-low{background:#fff0f0;color:#8b0000;}
+.tiv-bar{height:4px;background:var(--border);border-radius:2px;margin-top:2px;}
+.tiv-bar-fill{height:100%;background:var(--accent);border-radius:2px;}
+/* Moratorium weight sliders */
+.weight-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.weight-label{font-size:12px;font-weight:500;color:var(--text);width:180px;flex-shrink:0;}
+.weight-val{font-family:var(--mono);font-size:12px;font-weight:500;width:38px;text-align:right;color:var(--accent);flex-shrink:0;}
+.weight-total-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:10px;border-top:1px solid var(--border);}
+.weight-total{font-family:var(--mono);font-size:13px;font-weight:500;}
+.tier-preview{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px;}
+.tier-pip{border-radius:var(--radius);padding:10px 12px;border:1px solid var(--border);}
+.tier-pip-name{font-size:12px;font-weight:500;}
+.tier-pip-range{font-size:10px;margin-top:2px;color:var(--muted);}
+.tier-pip-action{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4;}
+.mora-preview{border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;align-items:center;gap:16px;border:1px solid var(--border);}
+.mora-score-big{font-family:var(--mono);font-size:32px;font-weight:500;line-height:1;}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">A</div>
+    <div>
+      <div class="logo-text">AMERIND Risk</div>
+      <div class="logo-sub">Wildfire Portfolio Monitor</div>
+    </div>
+  </div>
+  <div class="nav">
+    <button class="nav-btn active" onclick="showPage('alerts')">Alert Inbox</button>
+    <button class="nav-btn" onclick="showPage('portfolio')">Portfolio</button>
+    <button class="nav-btn" onclick="showPage('upload')">Upload</button>
+    <button class="nav-btn" onclick="showPage('config')">Settings</button>
+    <a href="index.html" style="margin-left:8px"><button class="nav-btn">Risk Tool ↗</button></a>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Stats always visible -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card">
+      <div class="stat-val" id="stat-total">—</div>
+      <div class="stat-label">Properties monitored</div>
+      <div class="stat-sub" id="stat-tiv">Loading...</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--critical)" id="stat-unacked">—</div>
+      <div class="stat-label">Unacknowledged alerts</div>
+      <div class="stat-sub" id="stat-alert-sub">Across all severity levels</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--high)" id="stat-highrisk">—</div>
+      <div class="stat-label">High-risk properties</div>
+      <div class="stat-sub">Score ≥ 65/100</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-last-run">—</div>
+      <div class="stat-label">Last monitor run</div>
+      <div class="stat-sub" id="stat-run-sub">—</div>
+    </div>
+  </div>
+
+  <!-- ALERT INBOX -->
+  <div class="page active" id="page-alerts">
+    <div class="alert-toolbar">
+      <div class="alert-filters">
+        <button class="filter-btn active" onclick="filterAlerts('all', this)">All</button>
+        <button class="filter-btn" onclick="filterAlerts('critical', this)">Critical</button>
+        <button class="filter-btn" onclick="filterAlerts('high', this)">High</button>
+        <button class="filter-btn" onclick="filterAlerts('moderate', this)">Moderate</button>
+        <button class="filter-btn" onclick="filterAlerts('unacked', this)">Unacknowledged</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="acknowledgeAll()">Acknowledge all</button>
+        <button class="btn btn-primary btn-sm" onclick="triggerManualRun()">Run monitor now</button>
+      </div>
+    </div>
+    <div id="alert-list"><div class="empty-state"><div class="empty-icon">🔔</div>Loading alerts...</div></div>
+  </div>
+
+  <!-- PORTFOLIO -->
+  <div class="page" id="page-portfolio">
+    <div class="card">
+      <div class="card-title">Portfolio overview</div>
+      <div id="portfolio-table-wrap"><div class="empty-state"><div class="empty-icon">📋</div>No properties loaded yet. Upload a CSV to begin.</div></div>
+    </div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="page" id="page-upload">
+    <div class="card">
+      <div class="card-title">Upload portfolio CSV / Excel</div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+           ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <div class="upload-zone-icon">📂</div>
+        <div class="upload-zone-text">Click to upload or drag and drop</div>
+        <div class="upload-zone-sub">CSV or Excel (.xlsx) — up to 30,000 rows</div>
+        <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFileSelect(event)"/>
+      </div>
+    </div>
+
+    <div class="card" id="col-map-card" style="display:none">
+      <div class="card-title">Column mapping — match your columns to required fields</div>
+      <div id="col-map-rows"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+        <div>
+          <label style="font-size:12px;font-weight:500;margin-right:8px">Upload mode:</label>
+          <select id="upload-mode" style="padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">
+            <option value="append">Append to existing</option>
+            <option value="replace">Replace all (clear first)</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="uploadPortfolio()">Upload portfolio</button>
+        <span id="upload-status" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div class="progress-bar" id="upload-progress-bar" style="display:none"><div class="progress-fill" id="upload-progress-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Expected CSV format</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        Required columns: <strong style="color:var(--text)">lat</strong> (or latitude), <strong style="color:var(--text)">lng</strong> (or longitude)<br>
+        Recommended: <strong style="color:var(--text)">address, city, state, zip, tiv, confidence, policy_number, tribe, location_type</strong><br>
+        TIV should be numeric (e.g. 250000). Confidence 0–100. Location type: ROOFTOP, RANGE_INTERPOLATED, GEOMETRIC_CENTER, APPROXIMATE.
+      </div>
+      <div style="margin-top:12px;font-family:var(--mono);font-size:11px;background:var(--bg);padding:12px;border-radius:var(--radius);color:var(--muted)">
+        address,city,state,zip,lat,lng,tiv,confidence,policy_number,tribe,location_type<br>
+        "123 Main St","Flagstaff","AZ","86001",35.1983,-111.6513,250000,95,POL-001,"Navajo Nation",ROOFTOP<br>
+        "456 Tribal Rd","Nespelem","WA","99155",48.1734,-118.9742,185000,72,POL-002,"Colville",RANGE_INTERPOLATED
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="page" id="page-config">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+      <div>
+        <div class="card">
+          <div class="card-title">Alert thresholds</div>
+          <div class="form-row">
+            <div class="form-label">Fire proximity (miles)</div>
+            <input class="form-input" type="number" id="cfg-fire-miles" value="25" min="1" max="200"/>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Risk score threshold</div>
+            <input class="form-input" type="number" id="cfg-risk-threshold" value="65" min="1" max="100"/>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Drought change alert</div>
+            <label class="toggle"><input type="checkbox" id="cfg-drought" checked><span class="toggle-slider"></span></label>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Red flag warning alert</div>
+            <label class="toggle"><input type="checkbox" id="cfg-redflag" checked><span class="toggle-slider"></span></label>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Topographic fire direction</div>
+            <label class="toggle"><input type="checkbox" id="cfg-topo" checked><span class="toggle-slider"></span></label>
+          </div>
+          <button class="btn btn-primary" style="margin-top:8px" onclick="saveConfig()">Save thresholds</button>
+        </div>
+
+        <!-- MORATORIUM SCORING WEIGHTS -->
+        <div class="card">
+          <div class="card-title">Moratorium score — factor weights</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+            Adjust how each factor contributes to the territory-level moratorium score. Weights must total 100%.
+          </div>
+
+          <div class="weight-row">
+            <div class="weight-label">Active fires within proximity</div>
+            <input type="range" min="0" max="60" step="1" value="25" id="w-fire" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-fire">25%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">Drought severity (D0–D4)</div>
+            <input type="range" min="0" max="60" step="1" value="20" id="w-drought" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-drought">20%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">% properties at high risk</div>
+            <input type="range" min="0" max="60" step="1" value="20" id="w-pct" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-pct">20%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">TIV concentration exposed</div>
+            <input type="range" min="0" max="60" step="1" value="15" id="w-tiv" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-tiv">15%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">Red flag / fire weather</div>
+            <input type="range" min="0" max="60" step="1" value="12" id="w-wx" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-wx">12%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">Terrain / wind amplification</div>
+            <input type="range" min="0" max="60" step="1" value="8" id="w-topo" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-topo">8%</div>
+          </div>
+
+          <div class="weight-total-row">
+            <div style="font-size:12px;color:var(--muted)">Total weight</div>
+            <div class="weight-total" id="weight-total" style="color:var(--low)">100%</div>
+          </div>
+
+          <!-- Tier threshold sliders -->
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:12px">Tier thresholds</div>
+            <div class="weight-row">
+              <div class="weight-label">Watch starts at</div>
+              <input type="range" min="10" max="50" step="1" value="35" id="t-watch" style="flex:1" oninput="updateWeights()"/>
+              <div class="weight-val" id="tv-watch" style="color:#2d6a2d">35</div>
+            </div>
+            <div class="weight-row">
+              <div class="weight-label">Warning starts at</div>
+              <input type="range" min="40" max="75" step="1" value="60" id="t-warning" style="flex:1" oninput="updateWeights()"/>
+              <div class="weight-val" id="tv-warning" style="color:#b07a00">60</div>
+            </div>
+            <div class="weight-row">
+              <div class="weight-label">Moratorium starts at</div>
+              <input type="range" min="65" max="95" step="1" value="80" id="t-mora" style="flex:1" oninput="updateWeights()"/>
+              <div class="weight-val" id="tv-mora" style="color:#8b0000">80</div>
+            </div>
+          </div>
+
+          <!-- Live tier preview -->
+          <div class="tier-preview" id="tier-preview"></div>
+
+          <!-- Live score preview -->
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Preview — sample territory</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Simulates a territory with 2 nearby fires, D3 drought, 45% high-risk properties, 60% TIV exposed, active red flag, high terrain risk.</div>
+            <div class="mora-preview" id="mora-preview">
+              <div class="mora-score-big" id="preview-score">—</div>
+              <div>
+                <div style="font-size:14px;font-weight:500" id="preview-tier">—</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px" id="preview-action">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
+            <button class="btn btn-primary btn-sm" onclick="saveMoratoriumWeights()">Save moratorium model</button>
+            <button class="btn btn-outline btn-sm" onclick="resetWeights()">Reset to defaults</button>
+            <span id="mora-save-status" style="font-size:12px;color:var(--muted)"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Monitor schedule</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.7">
+            Monitor runs automatically every <strong style="color:var(--text)">6 hours</strong> via Supabase Edge Functions.<br>
+            Last run: <span id="cfg-last-run" style="font-family:var(--mono);color:var(--text)">—</span><br>
+            Next run: <span id="cfg-next-run" style="font-family:var(--mono);color:var(--text)">—</span>
+          </div>
+          <div style="margin-top:12px">
+            <button class="btn btn-outline btn-sm" onclick="triggerManualRun()">Run now</button>
+          </div>
+          <div class="card-title" style="margin-top:20px">Recent runs</div>
+          <div id="run-log">Loading...</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-title">Alert recipients</div>
+          <div id="recipient-list">Loading...</div>
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <div class="card-title">Add recipient</div>
+            <div class="form-row">
+              <div class="form-label">Name</div>
+              <input class="form-input" type="text" id="new-name" placeholder="Jane Smith"/>
+            </div>
+            <div class="form-row">
+              <div class="form-label">Email</div>
+              <input class="form-input" type="email" id="new-email" placeholder="jsmith@amerind.org"/>
+            </div>
+            <div class="form-row">
+              <div class="form-label">Role</div>
+              <select class="form-input" id="new-role">
+                <option value="underwriter">Underwriter</option>
+                <option value="risk_control">Risk Control</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="addRecipient()">Add recipient</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIGURE THESE TWO VALUES — your Supabase project settings
+// Supabase → Settings → API
+const SUPA_URL = 'YOUR_SUPABASE_URL';       // e.g. https://xxxx.supabase.co
+const SUPA_KEY = 'YOUR_SUPABASE_ANON_KEY';  // anon/public key
+// ══════════════════════════════════════════════════════════════
+
+// Supabase REST helper
+async function sb(table, options = {}) {
+  const { filter='', method='GET', body=null, prefer='return=representation', select='' } = options;
+  const params = [];
+  if (filter) params.push(filter);
+  if (select) params.push('select='+select);
+  const url = `${SUPA_URL}/rest/v1/${table}${params.length ? '?'+params.join('&') : ''}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': prefer,
+    },
+    body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(`Supabase ${res.status}: ${t}`); }
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+let allAlerts = [];
+let parsedRows = [];
+let detectedColumns = [];
+let currentFilter = 'all';
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'config') loadConfig();
+  if (name === 'portfolio') loadPortfolioTable();
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const [props, runs] = await Promise.all([
+      sb('portfolio', { select: 'state,tiv,last_risk_score' }),
+      sb('monitor_runs', { filter: 'order=started_at.desc&limit=5' }),
+    ]);
+    const total = props.length;
+    const totalTIV = props.reduce((s,p)=>s+(p.tiv||0),0);
+    const highRisk = props.filter(p=>(p.last_risk_score||0)>=65).length;
+    document.getElementById('stat-total').textContent = total.toLocaleString();
+    document.getElementById('stat-tiv').textContent = totalTIV
+      ? '$' + new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(totalTIV) + ' total TIV'
+      : 'No TIV data';
+    document.getElementById('stat-highrisk').textContent = highRisk.toLocaleString();
+    const unacked = allAlerts.filter(a=>!a.acknowledged).length;
+    document.getElementById('stat-unacked').textContent = unacked;
+    if (runs?.length) {
+      const last = runs[0];
+      document.getElementById('stat-last-run').textContent = timeAgo(last.started_at);
+      document.getElementById('stat-run-sub').textContent = `${last.alerts_generated||0} alerts, ${last.properties_checked||0} checked`;
+    }
+  } catch(e) { console.warn('Stats load failed:', e); }
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '—';
+  const diff = (Date.now() - new Date(dateStr)) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+
+// ── Alert inbox ───────────────────────────────────────────────────────────────
+async function loadAlerts() {
+  try {
+    if (!SUPA_URL || !SUPA_KEY) {
+      document.getElementById('alert-list').innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div>Add your Supabase URL and anon key to the top of this file to connect.</div>';
+      return;
+    }
+    allAlerts = await sb('alerts', { filter: 'order=created_at.desc&limit=200' });
+    renderAlerts();
+    loadStats();
+  } catch(e) {
+    document.getElementById('alert-list').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Could not load alerts: ${e.message}</div>`;
+  }
+}
+
+function filterAlerts(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAlerts();
+}
+
+function renderAlerts() {
+  let filtered = allAlerts;
+  if (currentFilter === 'unacked') filtered = allAlerts.filter(a=>!a.acknowledged);
+  else if (currentFilter !== 'all') filtered = allAlerts.filter(a=>a.severity===currentFilter);
+
+  if (!filtered.length) {
+    document.getElementById('alert-list').innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>No alerts matching this filter.</div>';
+    return;
+  }
+
+  const typeIcons = { fire_proximity:'🔥', red_flag:'🚩', drought_change:'💧', risk_score:'📊', topo_fire:'⛰️' };
+
+  document.getElementById('alert-list').innerHTML = filtered.map(a => `
+    <div class="alert-card ${a.severity} ${a.acknowledged?'acknowledged':''}" id="alert-${a.id}">
+      <div style="padding-top:2px">${typeIcons[a.alert_type]||'⚠️'}</div>
+      <div class="alert-main">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="severity-badge ${a.severity}">${a.severity}</span>
+          <div class="alert-title">${a.title}</div>
+        </div>
+        <div class="alert-addr">${a.address||'—'}</div>
+        <div class="alert-body">${a.body||''}</div>
+        <div class="alert-meta">
+          ${a.tiv ? `<div class="alert-meta-item">TIV: <span>$${Math.round(a.tiv/1000)}K</span></div>` : ''}
+          ${a.risk_score ? `<div class="alert-meta-item">Risk score: <span>${a.risk_score}/100</span></div>` : ''}
+          ${a.trigger_value ? `<div class="alert-meta-item">Trigger: <span>${a.trigger_value}</span></div>` : ''}
+          <div class="alert-meta-item">Time: <span>${timeAgo(a.created_at)}</span></div>
+          ${a.acknowledged ? `<div class="alert-meta-item" style="color:#2d6a2d">✓ Acknowledged by <span>${a.acknowledged_by||'unknown'}</span></div>` : ''}
+        </div>
+      </div>
+      <div class="alert-actions">
+        ${!a.acknowledged ? `<button class="btn btn-outline btn-sm" onclick="acknowledge('${a.id}')">Acknowledge</button>` : ''}
+        <button class="btn btn-outline btn-sm" onclick="window.open('index.html#${a.lat},${a.lng}','_blank')">View on map</button>
+      </div>
+    </div>`).join('');
+}
+
+async function acknowledge(id) {
+  const by = prompt('Your name:') || 'Unknown';
+  await sb(`alerts`, { filter:`id=eq.${id}`, method:'PATCH', prefer:'return=minimal',
+    body:{ acknowledged:true, acknowledged_by:by, acknowledged_at:new Date().toISOString() } });
+  await loadAlerts();
+}
+
+async function acknowledgeAll() {
+  const unacked = allAlerts.filter(a=>!a.acknowledged);
+  if (!unacked.length) return alert('No unacknowledged alerts.');
+  const by = prompt(`Acknowledge all ${unacked.length} alerts. Your name:`);
+  if (!by) return;
+  await Promise.all(unacked.map(a => sb('alerts', {
+    filter:`id=eq.${a.id}`, method:'PATCH', prefer:'return=minimal',
+    body:{ acknowledged:true, acknowledged_by:by, acknowledged_at:new Date().toISOString() }
+  })));
+  await loadAlerts();
+}
+
+async function triggerManualRun() {
+  alert('Automated monitoring runs every 6 hours via Supabase Edge Functions.\n\nTo trigger a manual run, go to your Supabase project → Edge Functions → monitor → Invoke.');
+}
+
+// ── File upload ───────────────────────────────────────────────────────────────
+function handleDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag'); }
+function handleDragLeave() { document.getElementById('upload-zone').classList.remove('drag'); }
+function handleDrop(e) { e.preventDefault(); handleDragLeave(); if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); }
+function handleFileSelect(e) { if(e.target.files[0]) processFile(e.target.files[0]); }
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const wb = XLSX.read(e.target.result, { type:'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    parsedRows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+    if (!parsedRows.length) { alert('No data found in file.'); return; }
+
+    detectedColumns = Object.keys(parsedRows[0]);
+    showColumnMapper();
+    document.getElementById('upload-zone').querySelector('.upload-zone-text').textContent = `✓ ${file.name} — ${parsedRows.length.toLocaleString()} rows`;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showColumnMapper() {
+  const required = [
+    { field:'lat', label:'Latitude *', options:['lat','latitude','LAT','Latitude','y','Y'] },
+    { field:'lng', label:'Longitude *', options:['lng','lon','longitude','LON','LNG','Longitude','x','X'] },
+    { field:'address', label:'Street address', options:['address','Address','street','Street','cleaned addresses'] },
+    { field:'city', label:'City', options:['city','City'] },
+    { field:'state', label:'State', options:['state','State','st','ST'] },
+    { field:'zip', label:'ZIP code', options:['zip','ZIP','zipcode','postal_code','Zip'] },
+    { field:'tiv', label:'Total Insured Value', options:['tiv','TIV','total_insured_value','Total Insured Value','insured_value'] },
+    { field:'confidence', label:'Location confidence', options:['confidence','Confidence','location_confidence','conf'] },
+    { field:'policy_number', label:'Policy number', options:['policy_number','Policy Number','policy','Policy'] },
+    { field:'tribe', label:'Tribe / Nation', options:['tribe','Tribe','tribal_nation','nation'] },
+    { field:'location_type', label:'Location type', options:['location_type','Location Type','locationType','geocode_method'] },
+  ];
+
+  const html = required.map(r => {
+    const best = r.options.find(o => detectedColumns.includes(o)) || '';
+    const opts = ['(skip)', ...detectedColumns].map(c => `<option value="${c}" ${c===best?'selected':''}>${c}</option>`).join('');
+    return `<div class="col-map-row">
+      <div class="col-map-label">${r.label}</div>
+      <select class="col-map-select" id="map-${r.field}">${opts}</select>
+      ${best ? `<span style="font-size:10px;color:#2d6a2d">✓ auto-detected</span>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('col-map-rows').innerHTML = html;
+  document.getElementById('col-map-card').style.display = 'block';
+}
+
+async function uploadPortfolio() {
+  const mapping = ['lat','lng','address','city','state','zip','tiv','confidence','policy_number','tribe','location_type']
+    .reduce((acc, f) => { acc[f] = document.getElementById(`map-${f}`)?.value; return acc; }, {});
+
+  if (!mapping.lat || mapping.lat === '(skip)' || !mapping.lng || mapping.lng === '(skip)') {
+    alert('Latitude and longitude columns are required.'); return;
+  }
+
+  const records = parsedRows.map(row => {
+    const out = {};
+    Object.entries(mapping).forEach(([field, col]) => { if (col && col !== '(skip)') out[field] = row[col]; });
+    return out;
+  });
+
+  const mode = document.getElementById('upload-mode').value;
+  const status = document.getElementById('upload-status');
+  const progressBar = document.getElementById('upload-progress-bar');
+  const progressFill = document.getElementById('upload-progress-fill');
+
+  status.textContent = 'Uploading...';
+  progressBar.style.display = 'block';
+  progressFill.style.width = '30%';
+
+  try {
+    // Validate
+    const valid = [], errors = [];
+    records.forEach((r,i) => {
+      const lat = parseFloat(r.lat||r.latitude||r.LAT||r.Latitude);
+      const lng = parseFloat(r.lng||r.lon||r.longitude||r.LNG||r.LON||r.Longitude);
+      if (isNaN(lat)||isNaN(lng)) { errors.push(i+2); return; }
+      valid.push({
+        address: String(r.address||r.Address||r['cleaned addresses']||'').trim(),
+        city: String(r.city||r.City||'').trim(),
+        state: String(r.state||r.State||'').trim().toUpperCase().substring(0,2),
+        zip: String(r.zip||r.ZIP||r.zipcode||'').trim(),
+        lat, lng,
+        tiv: parseFloat(r.tiv||r.TIV||r['Total Insured Value']||0)||null,
+        confidence: parseFloat(r.confidence||r.Confidence||0)||null,
+        policy_number: String(r.policy_number||r['Policy Number']||'').trim()||null,
+        tribe: String(r.tribe||r.Tribe||'').trim()||null,
+        location_type: String(r.location_type||r['Location Type']||'').trim()||null,
+      });
+    });
+    // If replace mode, delete existing
+    if (mode === 'replace') {
+      await sb('portfolio', { filter:'id=neq.00000000-0000-0000-0000-000000000000', method:'DELETE', prefer:'return=minimal' });
+    }
+    // Insert in chunks of 500
+    const CHUNK = 500;
+    let inserted = 0;
+    for (let i=0; i<valid.length; i+=CHUNK) {
+      await sb('portfolio', { method:'POST', prefer:'return=minimal', body: valid.slice(i,i+CHUNK) });
+      inserted += Math.min(CHUNK, valid.length-i);
+      progressFill.style.width = Math.round(inserted/valid.length*100)+'%';
+    }
+    status.textContent = `✓ ${inserted.toLocaleString()} properties uploaded${errors.length ? `, ${errors.length} skipped` : ''}.`;
+    await loadStats();
+  } catch(e) {
+    status.textContent = `Upload failed: ${e.message}`;
+  }
+}
+
+// ── Portfolio table ───────────────────────────────────────────────────────────
+async function loadPortfolioTable() {
+  try {
+    const props = await sb('portfolio', {
+      filter:'order=last_risk_score.desc.nullslast&limit=500',
+      select:'address,city,state,tiv,confidence,location_type,last_risk_score,tribe'
+    });
+
+    if (!props?.length) {
+      document.getElementById('portfolio-table-wrap').innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>No properties loaded yet.</div>';
+      return;
+    }
+
+    const maxTIV = Math.max(...props.map(p=>p.tiv||0));
+    document.getElementById('portfolio-table-wrap').innerHTML = `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Showing top 500 by risk score</div>
+      <table class="portfolio-table">
+        <thead><tr>
+          <th>Address</th><th>State</th><th>Tribe</th>
+          <th>TIV</th><th>Confidence</th><th>Location type</th><th>Risk score</th>
+        </tr></thead>
+        <tbody>${props.map(p => {
+          const conf = p.confidence || 0;
+          const confClass = conf >= 85 ? 'conf-high' : conf >= 60 ? 'conf-med' : 'conf-low';
+          const riskColor = !p.last_risk_score ? '#ccc' : p.last_risk_score>=75?'var(--critical)':p.last_risk_score>=55?'var(--high)':p.last_risk_score>=35?'var(--moderate)':'var(--low)';
+          const tivPct = maxTIV ? Math.round((p.tiv||0)/maxTIV*100) : 0;
+          return `<tr>
+            <td>${p.address||'—'}${p.city?`, ${p.city}`:''}</td>
+            <td>${p.state||'—'}</td>
+            <td>${p.tribe||'—'}</td>
+            <td>${p.tiv?'$'+Math.round(p.tiv/1000)+'K':'—'}
+              ${p.tiv?`<div class="tiv-bar"><div class="tiv-bar-fill" style="width:${tivPct}%"></div></div>`:''}
+            </td>
+            <td>${conf?`<span class="conf-badge ${confClass}">${conf}%</span>`:'—'}</td>
+            <td style="font-size:10px;color:var(--muted)">${p.location_type||'—'}</td>
+            <td style="font-family:var(--mono);font-weight:500;color:${riskColor}">${p.last_risk_score||'—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+  } catch(e) {
+    document.getElementById('portfolio-table-wrap').innerHTML = '<div class="empty-state">Could not load portfolio. Check Supabase keys in settings.</div>';
+  }
+}
+
+// ── Moratorium weight sliders ─────────────────────────────────────────────────
+const WEIGHT_IDS = ['fire','drought','pct','tiv','wx','topo'];
+const WEIGHT_DEFAULTS = {fire:25,drought:20,pct:20,tiv:15,wx:12,topo:8};
+const TIER_DEFAULTS = {watch:35,warning:60,mora:80};
+
+// Sample territory values for live preview (fixed inputs, weights change)
+const SAMPLE = {fire:80, drought:75, pct:45, tiv:60, wx:100, topo:70};
+
+function updateWeights() {
+  let total = 0;
+  WEIGHT_IDS.forEach(id => {
+    const v = parseInt(document.getElementById('w-'+id).value);
+    document.getElementById('wv-'+id).textContent = v + '%';
+    total += v;
+  });
+
+  // Total indicator — red if not 100
+  const totalEl = document.getElementById('weight-total');
+  totalEl.textContent = total + '%';
+  totalEl.style.color = total === 100 ? 'var(--low)' : total > 100 ? 'var(--critical)' : 'var(--moderate)';
+
+  // Update tier threshold labels
+  ['watch','warning','mora'].forEach(t => {
+    document.getElementById('tv-'+t).textContent = document.getElementById('t-'+t).value;
+  });
+
+  // Enforce tier order
+  const watch = parseInt(document.getElementById('t-watch').value);
+  const warning = parseInt(document.getElementById('t-warning').value);
+  const mora = parseInt(document.getElementById('t-mora').value);
+  if (warning <= watch) document.getElementById('t-warning').value = watch + 1;
+  if (mora <= warning) document.getElementById('t-mora').value = warning + 1;
+
+  renderTierPreview();
+  renderMoratoriumPreview();
+}
+
+function renderTierPreview() {
+  const watch = parseInt(document.getElementById('t-watch').value);
+  const warning = parseInt(document.getElementById('t-warning').value);
+  const mora = parseInt(document.getElementById('t-mora').value);
+  document.getElementById('tier-preview').innerHTML = `
+    <div class="tier-pip" style="background:#EAF3DE;border-color:#3B6D11">
+      <div class="tier-pip-name" style="color:#27500A">Watch</div>
+      <div class="tier-pip-range" style="color:#3B6D11">${watch}–${warning-1}</div>
+      <div class="tier-pip-action">Flag for review. No binding restriction.</div>
+    </div>
+    <div class="tier-pip" style="background:#FAEEDA;border-color:#854F0B">
+      <div class="tier-pip-name" style="color:#633806">Warning</div>
+      <div class="tier-pip-range" style="color:#854F0B">${warning}–${mora-1}</div>
+      <div class="tier-pip-action">Restrict new business. Senior sign-off on renewals.</div>
+    </div>
+    <div class="tier-pip" style="background:#FCEBEB;border-color:#A32D2D">
+      <div class="tier-pip-name" style="color:#791F1F">Moratorium</div>
+      <div class="tier-pip-range" style="color:#A32D2D">${mora}–100</div>
+      <div class="tier-pip-action">Full suspension. Notify leadership immediately.</div>
+    </div>`;
+}
+
+function renderMoratoriumPreview() {
+  const watch = parseInt(document.getElementById('t-watch').value);
+  const warning = parseInt(document.getElementById('t-warning').value);
+  const mora = parseInt(document.getElementById('t-mora').value);
+
+  // Calculate score using current weights against sample territory
+  let score = 0;
+  let total = 0;
+  WEIGHT_IDS.forEach(id => {
+    const w = parseInt(document.getElementById('w-'+id).value);
+    total += w;
+    score += (SAMPLE[id] || 0) * (w / 100);
+  });
+  // Normalize if weights don't sum to 100
+  if (total > 0 && total !== 100) score = score * (100 / total);
+  score = Math.round(score);
+
+  let tier, tierColor, bg, border, action;
+  if (score >= mora) {
+    tier = 'Moratorium recommended';
+    tierColor = '#791F1F'; bg = '#FCEBEB'; border = '#A32D2D';
+    action = 'Suspend all new business and renewals. Notify leadership.';
+  } else if (score >= warning) {
+    tier = 'Warning — restrict new business';
+    tierColor = '#633806'; bg = '#FAEEDA'; border = '#854F0B';
+    action = 'Restrict new submissions. Renewals need senior sign-off.';
+  } else if (score >= watch) {
+    tier = 'Watch — elevated monitoring';
+    tierColor = '#27500A'; bg = '#EAF3DE'; border = '#3B6D11';
+    action = 'Flag new submissions for underwriter review.';
+  } else {
+    tier = 'No action required';
+    tierColor = 'var(--muted)'; bg = 'var(--surface)'; border = 'var(--border)';
+    action = 'Continue routine monitoring.';
+  }
+
+  const preview = document.getElementById('mora-preview');
+  preview.style.background = bg;
+  preview.style.borderColor = border;
+  document.getElementById('preview-score').textContent = score;
+  document.getElementById('preview-score').style.color = tierColor;
+  document.getElementById('preview-tier').textContent = tier;
+  document.getElementById('preview-tier').style.color = tierColor;
+  document.getElementById('preview-action').textContent = action;
+}
+
+function resetWeights() {
+  WEIGHT_IDS.forEach(id => {
+    document.getElementById('w-'+id).value = WEIGHT_DEFAULTS[id];
+  });
+  document.getElementById('t-watch').value = TIER_DEFAULTS.watch;
+  document.getElementById('t-warning').value = TIER_DEFAULTS.warning;
+  document.getElementById('t-mora').value = TIER_DEFAULTS.mora;
+  updateWeights();
+}
+
+async function saveMoratoriumWeights() {
+  const total = WEIGHT_IDS.reduce((s,id) => s + parseInt(document.getElementById('w-'+id).value), 0);
+  if (total !== 100) {
+    document.getElementById('mora-save-status').textContent = `Weights must total 100% (currently ${total}%)`;
+    document.getElementById('mora-save-status').style.color = 'var(--critical)';
+    return;
+  }
+  const weights = {};
+  WEIGHT_IDS.forEach(id => weights['mora_w_'+id] = parseInt(document.getElementById('w-'+id).value));
+  weights.mora_t_watch = parseInt(document.getElementById('t-watch').value);
+  weights.mora_t_warning = parseInt(document.getElementById('t-warning').value);
+  weights.mora_t_mora = parseInt(document.getElementById('t-mora').value);
+
+  const [mcfg] = await sb('alert_config', { filter:'is_global_default=eq.true&limit=1' });
+  if (mcfg?.id) await sb('alert_config', { filter:`id=eq.${mcfg.id}`, method:'PATCH', prefer:'return=minimal', body:weights });
+  const s = document.getElementById('mora-save-status');
+  s.textContent = '✓ Moratorium model saved';
+  s.style.color = 'var(--low)';
+  setTimeout(() => s.textContent = '', 3000);
+}
+
+function loadMoratoriumWeights(config) {
+  if (!config) return;
+  WEIGHT_IDS.forEach(id => {
+    const val = config['mora_w_'+id];
+    if (val !== undefined) document.getElementById('w-'+id).value = val;
+  });
+  if (config.mora_t_watch) document.getElementById('t-watch').value = config.mora_t_watch;
+  if (config.mora_t_warning) document.getElementById('t-warning').value = config.mora_t_warning;
+  if (config.mora_t_mora) document.getElementById('t-mora').value = config.mora_t_mora;
+  updateWeights();
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const [[config], recipients, runs] = await Promise.all([
+      sb('alert_config', { filter:'is_global_default=eq.true&limit=1' }),
+      sb('recipients', { filter:'order=created_at.asc' }),
+      sb('monitor_runs', { filter:'order=started_at.desc&limit=10' }),
+    ]);
+
+    if (config) {
+      document.getElementById('cfg-fire-miles').value = config.fire_proximity_miles || 25;
+      document.getElementById('cfg-risk-threshold').value = config.risk_score_threshold || 65;
+      document.getElementById('cfg-drought').checked = config.drought_change_trigger !== false;
+      document.getElementById('cfg-redflag').checked = config.red_flag_trigger !== false;
+      document.getElementById('cfg-topo').checked = config.topo_fire_trigger !== false;
+      loadMoratoriumWeights(config);
+    } else {
+      updateWeights(); // init with defaults
+    }
+
+    if (runs?.length) {
+      const last = runs[0];
+      document.getElementById('cfg-last-run').textContent = new Date(last.started_at).toLocaleString();
+      const nextRun = new Date(new Date(last.started_at).getTime() + 6*3600000);
+      document.getElementById('cfg-next-run').textContent = nextRun.toLocaleString();
+      document.getElementById('run-log').innerHTML = runs.map(r => `
+        <div class="run-log-item">
+          <span class="run-status ${r.status}">${r.status}</span>
+          <span style="color:var(--muted)">${new Date(r.started_at).toLocaleString()}</span>
+          <span>${r.properties_checked||0} checked</span>
+          <span style="color:var(--accent)">${r.alerts_generated||0} alerts</span>
+        </div>`).join('');
+    } else {
+      document.getElementById('run-log').innerHTML = '<div style="font-size:12px;color:var(--muted)">No runs yet.</div>';
+    }
+
+    renderRecipients(recipients || []);
+  } catch(e) {
+    console.warn('Config load failed:', e);
+    updateWeights(); // init sliders even if API fails
+  }
+}
+
+async function saveConfig() {
+  const body = {
+    fire_proximity_miles: parseFloat(document.getElementById('cfg-fire-miles').value),
+    risk_score_threshold: parseInt(document.getElementById('cfg-risk-threshold').value),
+    drought_change_trigger: document.getElementById('cfg-drought').checked,
+    red_flag_trigger: document.getElementById('cfg-redflag').checked,
+    topo_fire_trigger: document.getElementById('cfg-topo').checked,
+  };
+  const [cfg] = await sb('alert_config', { filter:'is_global_default=eq.true&limit=1' });
+  if (cfg?.id) await sb(`alert_config`, { filter:`id=eq.${cfg.id}`, method:'PATCH', prefer:'return=minimal', body });
+  const btn = event.target; btn.textContent = '✓ Saved'; setTimeout(()=>btn.textContent='Save thresholds', 2000);
+}
+
+function renderRecipients(recipients) {
+  const el = document.getElementById('recipient-list');
+  if (!recipients.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted)">No recipients configured.</div>'; return; }
+  el.innerHTML = recipients.map(r => `
+    <div class="recipient-row">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500">${r.name}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.email} &middot; ${r.role}</div>
+      </div>
+      <label class="toggle"><input type="checkbox" ${r.active?'checked':''} onchange="toggleRecipient('${r.id}',this.checked)"><span class="toggle-slider"></span></label>
+      <button class="btn btn-danger btn-sm" onclick="deleteRecipient('${r.id}')">Remove</button>
+    </div>`).join('');
+}
+
+async function addRecipient() {
+  const name = document.getElementById('new-name').value.trim();
+  const email = document.getElementById('new-email').value.trim();
+  const role = document.getElementById('new-role').value;
+  if (!name || !email) { alert('Name and email required.'); return; }
+  await sb('recipients', { method:'POST', body:{name,email,role} });
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-email').value = '';
+  loadConfig();
+}
+
+async function deleteRecipient(id) {
+  if (!confirm('Remove this recipient?')) return;
+  await sb(`recipients`, { filter:`id=eq.${id}`, method:'DELETE', prefer:'return=minimal' });
+  loadConfig();
+}
+
+async function toggleRecipient(id, active) {
+  await sb('recipients', { filter:`id=eq.${id}`, method:'PATCH', prefer:'return=minimal', body:{active} });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadAlerts();
+</script>
+</body>
+</html>
