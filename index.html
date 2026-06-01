@@ -3,130 +3,162 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>AMERIND Wildfire Risk Assessment</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<title>AMERIND Wildfire Monitor</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #f7f5f0; --surface: #ffffff; --border: #e2ddd6;
-  --text: #1a1814; --muted: #6b6560; --accent: #c4420a; --accent-light: #fdf0eb;
-  --d0: #fffacd; --d1: #f5c518; --d2: #e07b00; --d3: #cc2200; --d4: #7a0000;
-  --radius: 8px; --radius-lg: 14px;
-  --mono: 'DM Mono', monospace; --sans: 'DM Sans', sans-serif;
+  --bg:#f7f5f0;--surface:#fff;--border:#e2ddd6;--text:#1a1814;--muted:#6b6560;
+  --accent:#c4420a;--accent-light:#fdf0eb;--radius:8px;--radius-lg:14px;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+  --critical:#8b0000;--high:#c4420a;--moderate:#b07a00;--low:#2d6a2d;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; }
-header { background: var(--text); color: #fff; padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
-.logo { display: flex; align-items: center; gap: 10px; }
-.logo-mark { width: 32px; height: 32px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 13px; font-weight: 500; color: #fff; }
-.logo-text { font-size: 15px; font-weight: 500; }
-.logo-sub { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 1px; }
-.header-date { font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,0.4); }
-.container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
-.search-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px 24px; margin-bottom: 20px; }
-.search-label { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
-.search-row { display: flex; gap: 10px; }
-.search-row input { flex: 1; padding: 12px 16px; font-family: var(--sans); font-size: 15px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s; }
-.search-row input:focus { border-color: var(--accent); }
-.search-row input::placeholder { color: var(--muted); }
-.btn { padding: 12px 20px; font-family: var(--sans); font-size: 14px; font-weight: 500; border: none; border-radius: var(--radius); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: #a83608; }
-.btn-primary:disabled { background: #ccc; cursor: not-allowed; }
-.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
-.btn-outline:hover { background: var(--bg); }
-.btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
-#status { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 10px; min-height: 16px; display: flex; align-items: center; gap: 8px; }
-.spinner { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.main-grid { display: grid; grid-template-columns: 1fr 380px; gap: 20px; }
-@media (max-width: 860px) { .main-grid { grid-template-columns: 1fr; } }
-#map { height: 460px; border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; background: #e8e4dc; }
-.panel { display: flex; flex-direction: column; gap: 14px; }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; }
-.card-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
-.risk-banner { display: none; }
-.risk-banner.visible { display: block; }
-.risk-level-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
-.risk-score { font-family: var(--mono); font-size: 48px; font-weight: 500; line-height: 1; }
-.risk-label-text { font-size: 18px; font-weight: 500; }
-.risk-addr { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
-.risk-meter { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
-.risk-meter-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
-.export-row { display: flex; gap: 8px; }
-.export-row .btn { flex: 1; font-size: 13px; padding: 9px 10px; }
-.meta-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
-.meta-item { font-family: var(--mono); font-size: 10px; color: var(--muted); }
-.meta-item span { color: var(--text); font-weight: 500; }
-.factors-card { display: none; }
-.factors-card.visible { display: block; }
-.factor-row { margin-bottom: 11px; }
-.factor-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
-.factor-name { font-size: 12px; font-weight: 500; }
-.factor-score-num { font-family: var(--mono); font-size: 12px; font-weight: 500; }
-.factor-sub { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
-.factor-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-.factor-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
-.legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
-.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;}
+header{background:var(--text);color:#fff;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-mark{width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:500;color:#fff;}
+.logo-text{font-size:15px;font-weight:500;}
+.logo-sub{font-size:11px;color:rgba(255,255,255,0.5);margin-top:1px;}
+.nav{display:flex;gap:4px;}
+.nav-btn{padding:7px 14px;font-size:13px;font-weight:500;border:none;border-radius:6px;cursor:pointer;background:transparent;color:rgba(255,255,255,0.6);transition:all 0.15s;}
+.nav-btn:hover{background:rgba(255,255,255,0.1);color:#fff;}
+.nav-btn.active{background:var(--accent);color:#fff;}
+.container{max-width:1200px;margin:0 auto;padding:28px 24px;}
+.page{display:none;}
+.page.active{display:block;}
 
-/* Weather strip */
-.weather-strip { display: none; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.weather-strip.visible { display: grid; }
-.wx-cell { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; text-align: center; }
-.wx-val { font-family: var(--mono); font-size: 18px; font-weight: 500; }
-.wx-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
-.wx-warn { border-color: #cc2200; background: #fff8f6; }
-.wx-warn .wx-val { color: #cc2200; }
+/* Stats row */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;}
+.stat-val{font-family:var(--mono);font-size:28px;font-weight:500;}
+.stat-label{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.06em;}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:6px;}
 
-/* Red flag banner */
-.redflag-banner { display: none; background: #fff0ed; border: 1px solid #e07060; border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px; }
-.redflag-banner.visible { display: flex; align-items: flex-start; gap: 10px; }
-.redflag-icon { font-size: 18px; flex-shrink: 0; }
-.redflag-title { font-size: 13px; font-weight: 600; color: #8b0000; }
-.redflag-desc { font-size: 11px; color: #8b3030; margin-top: 2px; line-height: 1.4; }
+/* Alert inbox */
+.alert-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.alert-filters{display:flex;gap:8px;}
+.filter-btn{padding:6px 14px;font-size:12px;font-weight:500;border:1px solid var(--border);border-radius:20px;cursor:pointer;background:var(--surface);color:var(--muted);transition:all 0.15s;}
+.filter-btn.active{background:var(--text);color:#fff;border-color:var(--text);}
+.alert-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px;display:flex;gap:16px;align-items:flex-start;}
+.alert-card.critical{border-left:4px solid var(--critical);}
+.alert-card.high{border-left:4px solid var(--high);}
+.alert-card.moderate{border-left:4px solid var(--moderate);}
+.alert-card.acknowledged{opacity:0.5;}
+.severity-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;text-transform:uppercase;white-space:nowrap;}
+.severity-badge.critical{background:#fff0f0;color:var(--critical);}
+.severity-badge.high{background:var(--accent-light);color:var(--high);}
+.severity-badge.moderate{background:#fffbf0;color:var(--moderate);}
+.alert-main{flex:1;}
+.alert-title{font-size:14px;font-weight:500;margin-bottom:3px;}
+.alert-addr{font-size:12px;color:var(--muted);}
+.alert-body{font-size:12px;color:var(--text);margin-top:6px;line-height:1.5;}
+.alert-meta{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;}
+.alert-meta-item{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.alert-meta-item span{color:var(--text);font-weight:500;}
+.alert-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+.btn{padding:8px 16px;font-family:var(--sans);font-size:13px;font-weight:500;border:none;border-radius:var(--radius);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#a83608;}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border);}
+.btn-outline:hover{background:var(--bg);}
+.btn-sm{padding:5px 12px;font-size:12px;}
+.btn-danger{background:#fff0f0;color:var(--critical);border:1px solid #ffcccc;}
 
-/* Social feed */
-.social-panel { display: none; }
-.social-panel.visible { display: block; }
-.social-feed { max-height: 260px; overflow-y: auto; }
-.social-item { padding: 10px 0; border-bottom: 0.5px solid var(--border); }
-.social-item:last-child { border-bottom: none; }
-.social-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-.social-source { font-size: 11px; font-weight: 600; color: var(--accent); }
-.social-time { font-family: var(--mono); font-size: 10px; color: var(--muted); }
-.social-text { font-size: 12px; color: var(--text); line-height: 1.5; }
-.social-tag { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 10px; margin-top: 4px; font-weight: 500; }
-.tag-fire { background: #fff0eb; color: #a83608; }
-.tag-evac { background: #fff0f0; color: #8b0000; }
-.tag-smoke { background: #f5f5f0; color: #666; }
-.tag-safe { background: #f0fff0; color: #2d6a2d; }
-.social-empty { font-size: 12px; color: var(--muted); padding: 12px 0; font-style: italic; }
-.social-disclaimer { font-size: 10px; color: var(--muted); margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--border); line-height: 1.4; }
+/* Upload section */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:40px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--surface);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-light);}
+.upload-zone-icon{font-size:32px;margin-bottom:12px;}
+.upload-zone-text{font-size:15px;font-weight:500;margin-bottom:6px;}
+.upload-zone-sub{font-size:12px;color:var(--muted);}
+.col-map-row{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+.col-map-label{font-size:12px;font-weight:500;width:140px;flex-shrink:0;}
+.col-map-select{flex:1;padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);}
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;background:var(--accent);border-radius:4px;transition:width 0.3s;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;}
+.card-title{font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+.form-row{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.form-label{font-size:12px;font-weight:500;width:180px;flex-shrink:0;}
+.form-input{flex:1;padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);min-width:0;}
+.form-input:focus{outline:none;border-color:var(--accent);}
+.toggle{position:relative;display:inline-block;width:36px;height:20px;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:#ccc;border-radius:20px;cursor:pointer;transition:0.2s;}
+.toggle-slider:before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:0.2s;}
+.toggle input:checked+.toggle-slider{background:var(--accent);}
+.toggle input:checked+.toggle-slider:before{transform:translateX(16px);}
+.recipient-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border);}
+.recipient-row:last-child{border-bottom:none;}
+.run-log-item{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:12px;}
+.run-log-item:last-child{border-bottom:none;}
+.run-status{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:8px;}
+.run-status.complete{background:#f0fff0;color:#2d6a2d;}
+.run-status.error{background:#fff0f0;color:#8b0000;}
+.run-status.running{background:#fff8f0;color:#b07a00;}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;}
+.empty-icon{font-size:32px;margin-bottom:8px;}
+table.portfolio-table{width:100%;border-collapse:collapse;font-size:12px;}
+table.portfolio-table th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border);}
+table.portfolio-table td{padding:8px 12px;border-bottom:0.5px solid var(--border);}
+table.portfolio-table tr:hover td{background:var(--bg);}
+.conf-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:500;}
+.conf-high{background:#f0fff0;color:#2d6a2d;}
+.conf-med{background:#fffbf0;color:#b07a00;}
+.conf-low{background:#fff0f0;color:#8b0000;}
+.tiv-bar{height:4px;background:var(--border);border-radius:2px;margin-top:2px;}
+.tiv-bar-fill{height:100%;background:var(--accent);border-radius:2px;}
+/* ── Moratorium Decision Matrix ── */
+.mora-tier-none     { border-left:4px solid var(--low); }
+.mora-tier-watch    { border-left:4px solid var(--moderate); }
+.mora-tier-warning  { border-left:4px solid var(--high); }
+.mora-tier-moratorium { border-left:4px solid var(--critical); }
 
-/* ISO badge */
-.iso-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.mora-badge { display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;text-transform:uppercase;white-space:nowrap;font-family:var(--mono); }
+.mora-badge-none        { background:#f0fff0;color:var(--low); }
+.mora-badge-watch       { background:#fffbf0;color:var(--moderate); }
+.mora-badge-warning     { background:var(--accent-light);color:var(--high); }
+.mora-badge-moratorium  { background:#fff0f0;color:var(--critical); }
 
-/* Below-map full-width sections */
-.below-grid { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-@media (max-width: 860px) { .below-grid { grid-template-columns: 1fr; } }
-.below-grid-full { margin-top: 20px; }
+.mora-score-track { height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:4px; }
+.mora-score-fill-none       { height:100%;background:var(--low);border-radius:3px;transition:width 0.5s; }
+.mora-score-fill-watch      { height:100%;background:var(--moderate);border-radius:3px;transition:width 0.5s; }
+.mora-score-fill-warning    { height:100%;background:var(--high);border-radius:3px;transition:width 0.5s; }
+.mora-score-fill-moratorium { height:100%;background:var(--critical);border-radius:3px;transition:width 0.5s; }
 
-/* Sources footer */
-footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px; }
-.footer-sources { max-width: 1200px; margin: 0 auto; padding: 28px 24px 20px; }
-.footer-sources-title { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
-.sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
-.source-item { border: 1px solid var(--border); border-radius: var(--radius); padding: 11px 13px; background: var(--surface); }
-.source-name { font-size: 11px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
-.source-org { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
-.source-url { font-family: var(--mono); font-size: 9px; color: var(--accent); word-break: break-all; }
-.source-url a { color: var(--accent); text-decoration: none; }
-.source-url a:hover { text-decoration: underline; }
-.source-desc { font-size: 10px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
-.footer-bottom { border-top: 1px solid var(--border); padding: 12px 24px; text-align: center; font-size: 10px; color: var(--muted); max-width: 1200px; margin: 0 auto; }
+.mora-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px; }
+.mora-card-header { display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px; }
+.mora-card-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:6px 16px;margin-bottom:10px; }
+.mora-card-grid .full { grid-column:1/-1; }
+.mora-meta-label { font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;font-family:var(--mono); }
+.mora-meta-val { font-size:12px;font-weight:500;margin-top:1px; }
+
+.mora-decision-section { border-top:1px solid var(--border);padding-top:12px;margin-top:4px; }
+.mora-dec-btns { display:flex;gap:6px;margin:8px 0; }
+.mora-dec-btn { padding:5px 14px;font-size:12px;font-weight:500;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;background:var(--bg);color:var(--muted);transition:all 0.15s;font-family:var(--sans); }
+.mora-dec-btn:hover { color:var(--text);border-color:var(--text); }
+.mora-dec-btn.sel-mora    { background:#fff0f0;color:var(--critical);border-color:var(--critical); }
+.mora-dec-btn.sel-monitor { background:#fffbf0;color:var(--moderate);border-color:var(--moderate); }
+.mora-dec-btn.sel-clear   { background:#f0fff0;color:var(--low);border-color:#2d6a2d; }
+
+.mora-intake { border:2px dashed var(--border);border-radius:var(--radius-lg);padding:20px;background:var(--surface);margin-bottom:20px; }
+.mora-intake:focus-within { border-color:var(--accent); }
+.mora-intake textarea { width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:11px;padding:10px 12px;color:var(--text);resize:vertical;min-height:80px;line-height:1.6; }
+.mora-intake textarea:focus { outline:none;border-color:var(--accent); }
+
+/* Moratorium weight sliders */
+.weight-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.weight-label{font-size:12px;font-weight:500;color:var(--text);width:180px;flex-shrink:0;}
+.weight-val{font-family:var(--mono);font-size:12px;font-weight:500;width:38px;text-align:right;color:var(--accent);flex-shrink:0;}
+.weight-total-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:10px;border-top:1px solid var(--border);}
+.weight-total{font-family:var(--mono);font-size:13px;font-weight:500;}
+.tier-preview{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px;}
+.tier-pip{border-radius:var(--radius);padding:10px 12px;border:1px solid var(--border);}
+.tier-pip-name{font-size:12px;font-weight:500;}
+.tier-pip-range{font-size:10px;margin-top:2px;color:var(--muted);}
+.tier-pip-action{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4;}
+.mora-preview{border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;align-items:center;gap:16px;border:1px solid var(--border);}
+.mora-score-big{font-family:var(--mono);font-size:32px;font-weight:500;line-height:1;}
+
 </style>
 </head>
 <body>
@@ -136,817 +168,1299 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
     <div class="logo-mark">A</div>
     <div>
       <div class="logo-text">AMERIND Risk</div>
-      <div class="logo-sub">Wildfire Risk Assessment</div>
+      <div class="logo-sub">Wildfire Portfolio Monitor</div>
     </div>
   </div>
-  <div class="header-date" id="hdr-date"></div>
+  <div class="nav">
+    <button class="nav-btn active" onclick="showPage('alerts')">Alert Inbox</button>
+    <button class="nav-btn" onclick="showPage('portfolio')">Portfolio</button>
+    <button class="nav-btn" onclick="showPage('moratorium')">Moratorium</button>
+    <button class="nav-btn" onclick="showPage('upload')">Upload</button>
+    <button class="nav-btn" onclick="showPage('config')">Settings</button>
+    <a href="risk-tool.html" style="margin-left:8px"><button class="nav-btn">Risk Tool ↗</button></a>
+  </div>
 </header>
 
 <div class="container">
 
-  <!-- Search -->
-  <div class="search-section">
-    <div class="search-label">Property address</div>
-    <div class="search-row">
-      <input type="text" id="addr" placeholder="123 Main St, Flagstaff, AZ 86001" />
-      <button class="btn btn-primary" id="assess-btn" onclick="runSearch()">Assess risk</button>
+  <!-- Stats always visible -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card">
+      <div class="stat-val" id="stat-total">—</div>
+      <div class="stat-label">Properties monitored</div>
+      <div class="stat-sub" id="stat-tiv">Loading...</div>
     </div>
-    <div id="status">
-      <div class="spinner" id="spinner"></div>
-      <span id="status-text">Enter a property address to generate a wildfire risk assessment.</span>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--critical)" id="stat-unacked">—</div>
+      <div class="stat-label">Unacknowledged alerts</div>
+      <div class="stat-sub" id="stat-alert-sub">Across all severity levels</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--high)" id="stat-highrisk">—</div>
+      <div class="stat-label">High-risk properties</div>
+      <div class="stat-sub">Score ≥ 65/100</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-last-run">—</div>
+      <div class="stat-label">Last monitor run</div>
+      <div class="stat-sub" id="stat-run-sub">—</div>
     </div>
   </div>
 
-  <!-- Weather strip (full width above map) -->
-  <div class="weather-strip" id="weather-strip">
-    <div class="wx-cell" id="wx-temp"><div class="wx-val" id="wx-temp-val">—</div><div class="wx-label">Temperature</div></div>
-    <div class="wx-cell" id="wx-humidity"><div class="wx-val" id="wx-humidity-val">—</div><div class="wx-label">Humidity</div></div>
-    <div class="wx-cell" id="wx-wind"><div class="wx-val" id="wx-wind-val">—</div><div class="wx-label">Wind speed</div></div>
-    <div class="wx-cell" id="wx-gust"><div class="wx-val" id="wx-gust-val">—</div><div class="wx-label">Wind gust</div></div>
+  <!-- ALERT INBOX -->
+  <div class="page active" id="page-alerts">
+    <div class="alert-toolbar">
+      <div class="alert-filters">
+        <button class="filter-btn active" onclick="filterAlerts('all', this)">All</button>
+        <button class="filter-btn" onclick="filterAlerts('critical', this)">Critical</button>
+        <button class="filter-btn" onclick="filterAlerts('high', this)">High</button>
+        <button class="filter-btn" onclick="filterAlerts('moderate', this)">Moderate</button>
+        <button class="filter-btn" onclick="filterAlerts('unacked', this)">Unacknowledged</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="acknowledgeAll()">Acknowledge all</button>
+        <button class="btn btn-primary btn-sm" onclick="triggerManualRun()">Run monitor now</button>
+      </div>
+    </div>
+    <div id="alert-list"><div class="empty-state"><div class="empty-icon">🔔</div>Loading alerts...</div></div>
   </div>
-  <div style="height:12px" id="wx-spacer" style="display:none"></div>
 
-  <!-- Main grid: map + panel -->
-  <div class="main-grid">
-    <div>
-      <!-- Red flag warning -->
-      <div class="redflag-banner" id="redflag-banner">
-        <div class="redflag-icon">&#9873;</div>
+  <!-- PORTFOLIO -->
+  <div class="page" id="page-portfolio">
+    <div class="card">
+      <div class="card-title">Portfolio overview</div>
+      <div id="portfolio-table-wrap"><div class="empty-state"><div class="empty-icon">📋</div>No properties loaded yet. Upload a CSV to begin.</div></div>
+    </div>
+  </div>
+
+  <!-- MORATORIUM DECISION MATRIX -->
+  <div class="page" id="page-moratorium">
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Ingest RZAlert Email</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+        Paste the full text of any RZAlert Dispatcher email. The system parses fire stats, exposure, and tribal affiliation automatically and creates a decision case.
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <textarea id="mora-email-paste" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:11px;padding:10px 12px;color:var(--text);resize:vertical;min-height:90px;line-height:1.6" placeholder="Paste RZAlert email text here — fire name, coordinates, fire stats, exposure analysis, tribal affiliations...&#10;&#10;Example: North Canal Fire (2026-MTFBA-000131)&#10;6.7 Miles E of Fort Belknap Agency, MT in Blaine County&#10;Coordinates: 48.46507, -108.62208&#10;Fire Size: 50 Acres | Containment: unknown&#10;Policies: 1 within 2.5 miles. TIV: $311,876&#10;Tribal Affiliations: Fort Belknap Indian Community (Gros Ventre)"></textarea>
+        <button class="btn btn-primary" style="white-space:nowrap;flex-shrink:0;margin-top:0" onclick="moraParseAndIngest()">Parse &amp; Ingest →</button>
+      </div>
+      <div id="mora-parse-status" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+    </div>
+
+    <div class="alert-toolbar">
+      <div class="alert-filters">
+        <button class="filter-btn active" onclick="moraSetFilter('all',this)">All</button>
+        <button class="filter-btn" onclick="moraSetFilter('moratorium',this)">🚫 Moratorium</button>
+        <button class="filter-btn" onclick="moraSetFilter('warning',this)">⚠️ Warning</button>
+        <button class="filter-btn" onclick="moraSetFilter('watch',this)">👁 Watch</button>
+        <button class="filter-btn" onclick="moraSetFilter('none',this)">✓ Monitor</button>
+        <button class="filter-btn" onclick="moraSetFilter('undecided',this)">Undecided</button>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="loadMoratoriumCases()">↻ Refresh</button>
+    </div>
+
+    <div class="stats-row" style="margin-bottom:20px">
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--critical)" id="mora-stat-mora">—</div>
+        <div class="stat-label">Moratorium tier</div>
+        <div class="stat-sub">Immediate UW action required</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--high)" id="mora-stat-warning">—</div>
+        <div class="stat-label">Warning tier</div>
+        <div class="stat-sub">Decision needed within 24h</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--moderate)" id="mora-stat-watch">—</div>
+        <div class="stat-label">Watch tier</div>
+        <div class="stat-sub">Monitor closely</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--critical)" id="mora-stat-undecided">—</div>
+        <div class="stat-label">Undecided cases</div>
+        <div class="stat-sub">Warning/mora — no decision yet</div>
+      </div>
+    </div>
+
+    <div id="mora-case-list">
+      <div class="empty-state"><div class="empty-icon">🔥</div>No moratorium cases. Paste an RZAlert email above or click Refresh.</div>
+    </div>
+
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="page" id="page-upload">
+    <div class="card">
+      <div class="card-title">Upload portfolio CSV / Excel</div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+           ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <div class="upload-zone-icon">📂</div>
+        <div class="upload-zone-text">Click to upload or drag and drop</div>
+        <div class="upload-zone-sub">CSV or Excel (.xlsx) — up to 30,000 rows</div>
+        <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFileSelect(event)"/>
+      </div>
+    </div>
+
+    <div class="card" id="col-map-card" style="display:none">
+      <div class="card-title">Column mapping — match your columns to required fields</div>
+      <div id="col-map-rows"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
         <div>
-          <div class="redflag-title" id="redflag-title">Red flag warning in effect</div>
-          <div class="redflag-desc" id="redflag-desc"></div>
+          <label style="font-size:12px;font-weight:500;margin-right:8px">Upload mode:</label>
+          <select id="upload-mode" style="padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">
+            <option value="append">Append to existing</option>
+            <option value="replace">Replace all (clear first)</option>
+          </select>
         </div>
+        <button class="btn btn-primary" onclick="uploadPortfolio()">Upload portfolio</button>
+        <span id="upload-status" style="font-size:12px;color:var(--muted)"></span>
       </div>
-      <div id="map"></div>
+      <div class="progress-bar" id="upload-progress-bar" style="display:none"><div class="progress-fill" id="upload-progress-fill" style="width:0%"></div></div>
     </div>
 
-    <div class="panel">
-
-      <!-- Risk score -->
-      <div class="card risk-banner" id="risk-banner">
-        <div class="risk-level-row">
-          <div class="risk-score" id="risk-score-num">—</div>
-          <div class="risk-label-text" id="risk-label-text">—</div>
-        </div>
-        <div class="risk-addr" id="risk-addr"></div>
-        <div class="risk-meter"><div class="risk-meter-fill" id="risk-meter-fill"></div></div>
-        <div class="export-row">
-          <button class="btn btn-outline" id="pdf-btn" onclick="exportPDF()" disabled>Export PDF</button>
-          <button class="btn btn-outline" onclick="clearResults()">Clear</button>
-        </div>
-        <div class="meta-row" id="meta-row"></div>
+    <div class="card">
+      <div class="card-title">Expected CSV format</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        Required columns: <strong style="color:var(--text)">lat</strong> (or latitude), <strong style="color:var(--text)">lng</strong> (or longitude)<br>
+        Recommended: <strong style="color:var(--text)">address, city, state, zip, tiv, confidence, policy_number, tribe, location_type</strong><br>
+        TIV should be numeric (e.g. 250000). Confidence 0–100. Location type: ROOFTOP, RANGE_INTERPOLATED, GEOMETRIC_CENTER, APPROXIMATE.
       </div>
-
-      <!-- ISO fire protection class -->
-      <div class="card" id="iso-card" style="display:none">
-        <div class="card-title">ISO fire protection class</div>
-        <div id="iso-content"></div>
+      <div style="margin-top:12px;font-family:var(--mono);font-size:11px;background:var(--bg);padding:12px;border-radius:var(--radius);color:var(--muted)">
+        address,city,state,zip,lat,lng,tiv,confidence,policy_number,tribe,location_type<br>
+        "123 Main St","Flagstaff","AZ","86001",35.1983,-111.6513,250000,95,POL-001,"Navajo Nation",ROOFTOP<br>
+        "456 Tribal Rd","Nespelem","WA","99155",48.1734,-118.9742,185000,72,POL-002,"Colville",RANGE_INTERPOLATED
       </div>
-
-      <!-- Factor breakdown -->
-      <div class="card factors-card" id="factors-card">
-        <div class="card-title">Factor breakdown</div>
-        <div id="factor-list"></div>
-      </div>
-
-      <!-- Legend -->
-      <div class="card">
-        <div class="card-title">Map legend</div>
-        <div class="legend-grid">
-          <div class="legend-item"><div class="legend-dot" style="background:var(--d0)"></div>D0 Abnormally dry</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--d1)"></div>D1 Moderate</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--d2)"></div>D2 Severe</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--d3)"></div>D3 Extreme</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--d4)"></div>D4 Exceptional</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#ff6600;opacity:0.7"></div>Fire perimeters</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#ff4400;border:2px solid #cc0000"></div>Red flag zone</div>
-        </div>
-      </div>
-
     </div>
   </div>
 
-  <!-- Below grid: tribal social feed -->
-  <div class="below-grid-full" id="social-section" style="display:none">
-    <div class="card social-panel visible" id="social-panel">
-      <div class="card-title">Tribal emergency communications — nearby social feeds</div>
-      <div class="social-feed" id="social-feed"></div>
-      <div class="social-disclaimer">
-        Posts surfaced via X/Twitter public search for tribal emergency management accounts and hashtags near this location. Verify all posts directly with the originating tribal authority before acting on this information.
-        <a href="#" id="social-search-link" target="_blank" style="color:var(--accent);text-decoration:none;margin-left:4px">Search X directly &rarr;</a>
+  <!-- SETTINGS -->
+  <div class="page" id="page-config">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+      <div>
+        <div class="card">
+          <div class="card-title">Alert thresholds</div>
+          <div class="form-row">
+            <div class="form-label">Fire proximity (miles)</div>
+            <input class="form-input" type="number" id="cfg-fire-miles" value="25" min="1" max="200"/>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Risk score threshold</div>
+            <input class="form-input" type="number" id="cfg-risk-threshold" value="65" min="1" max="100"/>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Drought change alert</div>
+            <label class="toggle"><input type="checkbox" id="cfg-drought" checked><span class="toggle-slider"></span></label>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Red flag warning alert</div>
+            <label class="toggle"><input type="checkbox" id="cfg-redflag" checked><span class="toggle-slider"></span></label>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Topographic fire direction</div>
+            <label class="toggle"><input type="checkbox" id="cfg-topo" checked><span class="toggle-slider"></span></label>
+          </div>
+          <button class="btn btn-primary" style="margin-top:8px" onclick="saveConfig()">Save thresholds</button>
+        </div>
+
+        <!-- MORATORIUM SCORING WEIGHTS -->
+        <div class="card">
+          <div class="card-title">Moratorium score — factor weights</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+            Adjust how each factor contributes to the moratorium score. Weights must total 100%. Containment and growth rate are forward-looking escalators — recommended to keep them highest.
+          </div>
+
+          <div class="weight-row">
+            <div class="weight-label">Containment % <span style="font-size:10px;color:var(--accent)">↑ forward-looking</span></div>
+            <input type="range" min="0" max="60" step="1" value="22" id="w-containment" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-containment">22%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">Fire growth rate <span style="font-size:10px;color:var(--accent)">↑ forward-looking</span></div>
+            <input type="range" min="0" max="60" step="1" value="18" id="w-growth" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-growth">18%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">Fire size (acres)</div>
+            <input type="range" min="0" max="60" step="1" value="20" id="w-fire" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-fire">20%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">TIV exposed</div>
+            <input type="range" min="0" max="60" step="1" value="14" id="w-tiv" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-tiv">14%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">Policy count</div>
+            <input type="range" min="0" max="60" step="1" value="10" id="w-policy" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-policy">10%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">Red flag / fire weather</div>
+            <input type="range" min="0" max="60" step="1" value="10" id="w-wx" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-wx">10%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">Drought severity (D0–D4)</div>
+            <input type="range" min="0" max="60" step="1" value="4" id="w-drought" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-drought">4%</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-label">Terrain amplification</div>
+            <input type="range" min="0" max="60" step="1" value="2" id="w-topo" style="flex:1" oninput="updateWeights()"/>
+            <div class="weight-val" id="wv-topo">2%</div>
+          </div>
+
+          <div class="weight-total-row">
+            <div style="font-size:12px;color:var(--muted)">Total weight</div>
+            <div class="weight-total" id="weight-total" style="color:var(--low)">100%</div>
+          </div>
+
+          <!-- Tier threshold sliders -->
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:12px">Tier thresholds</div>
+            <div class="weight-row">
+              <div class="weight-label">Watch starts at</div>
+              <input type="range" min="10" max="50" step="1" value="35" id="t-watch" style="flex:1" oninput="updateWeights()"/>
+              <div class="weight-val" id="tv-watch" style="color:#2d6a2d">35</div>
+            </div>
+            <div class="weight-row">
+              <div class="weight-label">Warning starts at</div>
+              <input type="range" min="40" max="75" step="1" value="60" id="t-warning" style="flex:1" oninput="updateWeights()"/>
+              <div class="weight-val" id="tv-warning" style="color:#b07a00">60</div>
+            </div>
+            <div class="weight-row">
+              <div class="weight-label">Moratorium starts at</div>
+              <input type="range" min="65" max="95" step="1" value="80" id="t-mora" style="flex:1" oninput="updateWeights()"/>
+              <div class="weight-val" id="tv-mora" style="color:#8b0000">80</div>
+            </div>
+          </div>
+
+          <!-- Live tier preview -->
+          <div class="tier-preview" id="tier-preview"></div>
+
+          <!-- Live score preview -->
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Preview — sample territory</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Simulates: 200-acre fire, 0% containment, 2nd alert (growing), $500K TIV, 3 policies, 15 mph winds, D2 drought, moderate terrain.</div>
+            <div class="mora-preview" id="mora-preview">
+              <div class="mora-score-big" id="preview-score">—</div>
+              <div>
+                <div style="font-size:14px;font-weight:500" id="preview-tier">—</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px" id="preview-action">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
+            <button class="btn btn-primary btn-sm" onclick="saveMoratoriumWeights()">Save moratorium model</button>
+            <button class="btn btn-outline btn-sm" onclick="resetWeights()">Reset to defaults</button>
+            <span id="mora-save-status" style="font-size:12px;color:var(--muted)"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Monitor schedule</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.7">
+            Monitor runs automatically every <strong style="color:var(--text)">6 hours</strong> via Supabase Edge Functions.<br>
+            Last run: <span id="cfg-last-run" style="font-family:var(--mono);color:var(--text)">—</span><br>
+            Next run: <span id="cfg-next-run" style="font-family:var(--mono);color:var(--text)">—</span>
+          </div>
+          <div style="margin-top:12px">
+            <button class="btn btn-outline btn-sm" onclick="triggerManualRun()">Run now</button>
+          </div>
+          <div class="card-title" style="margin-top:20px">Recent runs</div>
+          <div id="run-log">Loading...</div>
+        </div>
       </div>
+
+      <div>
+        <div class="card">
+          <div class="card-title">Alert recipients</div>
+          <div id="recipient-list">Loading...</div>
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <div class="card-title">Add recipient</div>
+            <div class="form-row">
+              <div class="form-label">Name</div>
+              <input class="form-input" type="text" id="new-name" placeholder="Jane Smith"/>
+            </div>
+            <div class="form-row">
+              <div class="form-label">Email</div>
+              <input class="form-input" type="email" id="new-email" placeholder="jsmith@amerind.org"/>
+            </div>
+            <div class="form-row">
+              <div class="form-label">Role</div>
+              <select class="form-input" id="new-role">
+                <option value="underwriter">Underwriter</option>
+                <option value="risk_control">Risk Control</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="addRecipient()">Add recipient</button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
 </div>
 
-<footer>
-  <div class="footer-sources">
-    <div class="footer-sources-title">Data sources</div>
-    <div class="sources-grid">
-      <div class="source-item">
-        <div class="source-name">U.S. Drought Monitor</div>
-        <div class="source-org">NDMC / USDA / NOAA</div>
-        <div class="source-url"><a href="https://droughtmonitor.unl.edu" target="_blank">droughtmonitor.unl.edu</a></div>
-        <div class="source-desc">Weekly D0–D4 drought classification. Updated every Thursday.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Fire perimeters (YTD)</div>
-        <div class="source-org">WFIGS / NIFC</div>
-        <div class="source-url"><a href="https://data-nifc.opendata.arcgis.com" target="_blank">data-nifc.opendata.arcgis.com</a></div>
-        <div class="source-desc">Current-year wildfire perimeters updated continuously during fire season.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Red flag warnings</div>
-        <div class="source-org">NOAA / National Weather Service</div>
-        <div class="source-url"><a href="https://api.weather.gov" target="_blank">api.weather.gov</a></div>
-        <div class="source-desc">Active fire weather watches and red flag warnings from NWS forecast zones.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Live weather conditions</div>
-        <div class="source-org">Open-Meteo</div>
-        <div class="source-url"><a href="https://open-meteo.com" target="_blank">open-meteo.com</a></div>
-        <div class="source-desc">Current temperature, humidity, wind speed and gusts. Free, no API key required.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">ISO fire protection class</div>
-        <div class="source-org">ISO / Verisk (estimated)</div>
-        <div class="source-url"><a href="https://www.isomitigation.com" target="_blank">isomitigation.com</a></div>
-        <div class="source-desc">Estimated PPC based on distance to fire station and urbanization. Verify with ISO directly for binding underwriting decisions.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Tribal social feeds</div>
-        <div class="source-org">X / Twitter public search</div>
-        <div class="source-url"><a href="https://twitter.com/search" target="_blank">twitter.com/search</a></div>
-        <div class="source-desc">Public posts from tribal emergency management accounts and wildfire hashtags near the assessed location.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Geocoding</div>
-        <div class="source-org">Google Maps Platform</div>
-        <div class="source-url"><a href="https://developers.google.com/maps/documentation/geocoding" target="_blank">developers.google.com/maps</a></div>
-        <div class="source-desc">Address-to-coordinate resolution and reverse geocoding.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Vegetation &amp; WUI zones</div>
-        <div class="source-org">USFS / LANDFIRE (regional heuristic)</div>
-        <div class="source-url"><a href="https://www.landfire.gov" target="_blank">landfire.gov</a></div>
-        <div class="source-desc">State-level vegetation risk and WUI density classification.</div>
-      </div>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    AMERIND Risk &mdash; Wildfire Risk Assessment Tool &mdash; For underwriting use only. Not a substitute for on-site inspection or certified fire risk evaluation.
-  </div>
-</footer>
-
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script>
-const API_KEY = "AIzaSyDomOvPPEUknUqFW-QFo3Eh6OD-g3lorVs";
-let map, marker, droughtLayer, fireLayer, redFlagLayer, currentResult = null;
+// ══════════════════════════════════════════════════════════════
+// CONFIGURE THESE TWO VALUES — your Supabase project settings
+// Supabase → Settings → API
+const SUPA_URL = 'https://cwnshkewhrummwpnfwlh.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3bnNoa2V3aHJ1bW13cG5md2xoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4OTA5MjgsImV4cCI6MjA5NTQ2NjkyOH0.AnhNOmV7vBo2lBy0ob4K0-CdMqUlnIZWG6fEzdvy-Jo';
+// ══════════════════════════════════════════════════════════════
 
-document.getElementById('hdr-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
-document.getElementById('addr').addEventListener('keydown', e => { if(e.key==='Enter') runSearch(); });
-
-function setStatus(msg, loading=false) {
-  document.getElementById('status-text').textContent = msg;
-  document.getElementById('spinner').style.display = loading ? 'block' : 'none';
+// Supabase REST helper
+async function sb(table, options = {}) {
+  const { filter='', method='GET', body=null, prefer='return=representation', select='' } = options;
+  const params = [];
+  if (filter) params.push(filter);
+  if (select) params.push('select='+select);
+  const url = `${SUPA_URL}/rest/v1/${table}${params.length ? '?'+params.join('&') : ''}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': prefer,
+    },
+    body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(`Supabase ${res.status}: ${t}`); }
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return text; }
 }
 
-function initMap(lat, lng) {
-  if (!map) {
-    map = L.map('map').setView([lat, lng], 11);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
-      attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
-    }).addTo(map);
-  } else {
-    map.setView([lat, lng], 11);
+let allAlerts = [];
+let parsedRows = [];
+let detectedColumns = [];
+let currentFilter = 'all';
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'config') loadConfig();
+  if (name === 'portfolio') loadPortfolioTable();
+  if (name === 'moratorium') loadMoratoriumCases();
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const [props, runs] = await Promise.all([
+      sb('portfolio', { select: 'state,tiv,last_risk_score' }),
+      sb('monitor_runs', { filter: 'order=started_at.desc&limit=5' }),
+    ]);
+    const total = props.length;
+    const totalTIV = props.reduce((s,p)=>s+(p.tiv||0),0);
+    const highRisk = props.filter(p=>(p.last_risk_score||0)>=65).length;
+    document.getElementById('stat-total').textContent = total.toLocaleString();
+    document.getElementById('stat-tiv').textContent = totalTIV
+      ? '$' + new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(totalTIV) + ' total TIV'
+      : 'No TIV data';
+    document.getElementById('stat-highrisk').textContent = highRisk.toLocaleString();
+    const unacked = allAlerts.filter(a=>!a.acknowledged).length;
+    document.getElementById('stat-unacked').textContent = unacked;
+    if (runs?.length) {
+      const last = runs[0];
+      document.getElementById('stat-last-run').textContent = timeAgo(last.started_at);
+      document.getElementById('stat-run-sub').textContent = `${last.alerts_generated||0} alerts, ${last.properties_checked||0} checked`;
+    }
+  } catch(e) { console.warn('Stats load failed:', e); }
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '—';
+  const diff = (Date.now() - new Date(dateStr)) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+
+// ── Alert inbox ───────────────────────────────────────────────────────────────
+async function loadAlerts() {
+  try {
+    if (!SUPA_URL || !SUPA_KEY) {
+      document.getElementById('alert-list').innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div>Add your Supabase URL and anon key to the top of this file to connect.</div>';
+      return;
+    }
+    allAlerts = await sb('alerts', { filter: 'order=created_at.desc&limit=200' });
+    renderAlerts();
+    loadStats();
+  } catch(e) {
+    document.getElementById('alert-list').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Could not load alerts: ${e.message}</div>`;
   }
 }
 
-function droughtColor(dm) {
-  return ['#fffacd','#f5c518','#e07b00','#cc2200','#7a0000'][dm] || '#fffacd';
+function filterAlerts(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAlerts();
 }
 
-async function addDroughtLayer(lat, lng) {
-  if (droughtLayer) map.removeLayer(droughtLayer);
+function renderAlerts() {
+  let filtered = allAlerts;
+  if (currentFilter === 'unacked') filtered = allAlerts.filter(a=>!a.acknowledged);
+  else if (currentFilter !== 'all') filtered = allAlerts.filter(a=>a.severity===currentFilter);
 
-  const bbox = `${lng-6},${lat-6},${lng+6},${lat+6}`;
-
-  // PRIMARY: Call our own Netlify serverless function — no CORS, cached, reliable
-  // Falls back to direct ArcGIS if running locally (not on Netlify)
-  const sources = [
-    () => fetch(`/.netlify/functions/drought?bbox=${bbox}`, { signal: AbortSignal.timeout(10000) }),
-    () => fetch(`https://services.arcgis.com/jIL9msH9OI208GCb/arcgis/rest/services/US_Drought_Monitor_Current/FeatureServer/0/query?where=1%3D1&outFields=DM&geometry=${lng-6}%2C${lat-6}%2C${lng+6}%2C${lat+6}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=geojson`, { signal: AbortSignal.timeout(8000) }),
-    () => fetch(`https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/US_Drought_Monitor_Current/FeatureServer/0/query?where=1%3D1&outFields=DM&geometry=${lng-6}%2C${lat-6}%2C${lng+6}%2C${lat+6}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=geojson`, { signal: AbortSignal.timeout(8000) }),
-  ];
-
-  for (const fetchFn of sources) {
-    try {
-      const r = await fetchFn();
-      if (!r.ok) continue;
-      const result = await r.json();
-
-      // Our function wraps in {source, geojson} — direct ArcGIS returns GeoJSON directly
-      const geojson = result.geojson || result;
-      const source = result.source || 'arcgis_direct';
-
-      if (!geojson.features?.length) continue;
-
-      console.log(`Drought data loaded from: ${source} (${geojson.features.length} features)`);
-
-      // Only render map layer if features have geometry (arcgis sources do, ndmc_stats fallback doesn't)
-      if (geojson.features[0]?.geometry) {
-        droughtLayer = L.geoJSON(geojson, {
-          style: f => ({fillColor: droughtColor(f.properties.DM ?? 0), weight: 0.5, color: '#bbb', fillOpacity: 0.45}),
-          onEachFeature: (f, l) => {
-            const lvl = ['D0 Abnormally Dry','D1 Moderate','D2 Severe','D3 Extreme','D4 Exceptional'];
-            l.bindPopup(`<b>Drought:</b> ${lvl[f.properties.DM] ?? 'Unknown'}`);
-          }
-        }).addTo(map);
-      } else {
-        // Stats-only fallback — show a status note on the map
-        setStatus(`Assessment complete — drought data: county statistics (no map layer)`);
-      }
-
-      return geojson.features;
-    } catch(e) {
-      console.warn(`Drought source failed: ${e.message}`);
-    }
+  if (!filtered.length) {
+    document.getElementById('alert-list').innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>No alerts matching this filter.</div>';
+    return;
   }
 
-  console.warn('All drought sources failed');
-  return [];
-}
+  const typeIcons = { fire_proximity:'🔥', red_flag:'🚩', drought_change:'💧', risk_score:'📊', topo_fire:'⛰️' };
 
-async function addFireLayer(lat, lng) {
-  if (fireLayer) map.removeLayer(fireLayer);
-  try {
-    const url = `https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters_YTD/FeatureServer/0/query?where=1%3D1&outFields=IncidentName,GISAcres&geometry=${lng-4}%2C${lat-4}%2C${lng+4}%2C${lat+4}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=geojson`;
-    const r = await fetch(url);
-    const data = await r.json();
-    if (data.features?.length) {
-      fireLayer = L.geoJSON(data, {
-        style:{fillColor:'#ff5500',color:'#cc2200',weight:1,fillOpacity:0.3},
-        onEachFeature:(f,l) => {
-          const acres = f.properties.GISAcres ? Math.round(f.properties.GISAcres).toLocaleString() : '?';
-          l.bindPopup(`<b>${f.properties.IncidentName??'Unknown Fire'}</b><br>${acres} acres`);
-        }
-      }).addTo(map);
-      return data.features.length;
-    }
-  } catch(e) { console.error('Fire error',e); }
-  return 0;
-}
-
-// ── NEW: NOAA Red Flag Warnings ──────────────────────────────────────────────
-async function fetchRedFlagWarnings(lat, lng) {
-  try {
-    const ptRes = await fetch(`https://api.weather.gov/points/${lat.toFixed(4)},${lng.toFixed(4)}`);
-    const ptData = await ptRes.json();
-    const zone = ptData.properties?.fireWeatherZone || ptData.properties?.forecastZone;
-    if (!zone) return null;
-
-    const alertRes = await fetch(`https://api.weather.gov/alerts/active?zone=${zone.split('/').pop()}&event=Red%20Flag%20Warning`);
-    const alertData = await alertRes.json();
-    if (alertData.features?.length) {
-      const alert = alertData.features[0].properties;
-      return { headline: alert.headline, description: alert.description?.substring(0,200)+'...', expires: alert.expires };
-    }
-
-    // Also check fire weather watches
-    const watchRes = await fetch(`https://api.weather.gov/alerts/active?zone=${zone.split('/').pop()}&event=Fire%20Weather%20Watch`);
-    const watchData = await watchRes.json();
-    if (watchData.features?.length) {
-      const alert = watchData.features[0].properties;
-      return { headline: alert.headline, description: alert.description?.substring(0,200)+'...', expires: alert.expires, isWatch: true };
-    }
-  } catch(e) { console.error('Red flag error',e); }
-  return null;
-}
-
-function renderRedFlag(alert) {
-  const banner = document.getElementById('redflag-banner');
-  if (!alert) { banner.classList.remove('visible'); return; }
-  banner.classList.add('visible');
-  document.getElementById('redflag-title').textContent = alert.isWatch ? 'Fire weather watch in effect' : 'Red flag warning in effect';
-  const exp = alert.expires ? new Date(alert.expires).toLocaleString() : 'unknown';
-  document.getElementById('redflag-desc').textContent = `${alert.headline || ''} — Expires: ${exp}`;
-}
-
-// ── NEW: Live Weather (Open-Meteo, no key required) ──────────────────────────
-async function fetchWeather(lat, lng) {
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_gusts_10m&wind_speed_unit=mph&temperature_unit=fahrenheit`;
-    const r = await fetch(url);
-    const d = await r.json();
-    return d.current;
-  } catch(e) { console.error('Weather error',e); return null; }
-}
-
-function renderWeather(wx) {
-  const strip = document.getElementById('weather-strip');
-  if (!wx) { strip.classList.remove('visible'); return; }
-  strip.classList.add('visible');
-  document.getElementById('wx-spacer').style.display = 'block';
-
-  const temp = Math.round(wx.temperature_2m);
-  const humidity = Math.round(wx.relative_humidity_2m);
-  const wind = Math.round(wx.wind_speed_10m);
-  const gust = Math.round(wx.wind_gusts_10m);
-
-  document.getElementById('wx-temp-val').textContent = temp + '°F';
-  document.getElementById('wx-humidity-val').textContent = humidity + '%';
-  document.getElementById('wx-wind-val').textContent = wind + ' mph';
-  document.getElementById('wx-gust-val').textContent = gust + ' mph';
-
-  // Highlight danger thresholds
-  document.getElementById('wx-humidity').className = 'wx-cell' + (humidity < 15 ? ' wx-warn' : '');
-  document.getElementById('wx-wind').className = 'wx-cell' + (wind > 25 ? ' wx-warn' : '');
-  document.getElementById('wx-gust').className = 'wx-cell' + (gust > 35 ? ' wx-warn' : '');
-
-  return { temp, humidity, wind, gust };
-}
-
-// ── NEW: ISO Fire Protection Class (estimated) ────────────────────────────────
-async function getISOClass(lat, lng, state) {
-  // Estimate PPC based on NWS station proximity heuristic + urbanization
-  // Real PPC requires ISO/Verisk data license — this is an estimate for display
-  try {
-    const r = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&result_type=locality|sublocality&key=${API_KEY}`);
-    const d = await r.json();
-    const isUrban = d.results?.length > 0;
-    const isSuburban = d.results?.some(r => r.types.includes('sublocality'));
-
-    // Western rural states have higher PPC numbers (worse coverage)
-    const ruralWest = ['AZ','NM','NV','UT','ID','MT','WY','OR','WA','CO'].includes(state);
-
-    let ppc, label, color;
-    if (isUrban && !ruralWest) { ppc = '2–3'; label = 'Good urban coverage'; color = '#2d6a2d'; }
-    else if (isUrban && ruralWest) { ppc = '4–5'; label = 'Moderate — western urban'; color = '#b07a00'; }
-    else if (ruralWest) { ppc = '8–9'; label = 'Limited — rural western'; color = '#c4420a'; }
-    else { ppc = '5–6'; label = 'Moderate rural coverage'; color = '#b07a00'; }
-
-    return { ppc, label, color, estimated: true };
-  } catch(e) {}
-  return { ppc: '?', label: 'Unable to estimate', color: '#888', estimated: true };
-}
-
-function renderISO(iso) {
-  const card = document.getElementById('iso-card');
-  card.style.display = 'block';
-  document.getElementById('iso-content').innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div>
-        <div class="iso-badge" style="background:${iso.color}22;color:${iso.color};border:1px solid ${iso.color}44">
-          Class ${iso.ppc}
+  document.getElementById('alert-list').innerHTML = filtered.map(a => `
+    <div class="alert-card ${a.severity} ${a.acknowledged?'acknowledged':''}" id="alert-${a.id}">
+      <div style="padding-top:2px">${typeIcons[a.alert_type]||'⚠️'}</div>
+      <div class="alert-main">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="severity-badge ${a.severity}">${a.severity}</span>
+          <div class="alert-title">${a.title}</div>
+        </div>
+        <div class="alert-addr">${a.address||'—'}</div>
+        <div class="alert-body">${a.body||''}</div>
+        <div class="alert-meta">
+          ${a.tiv ? `<div class="alert-meta-item">TIV: <span>$${Math.round(a.tiv/1000)}K</span></div>` : ''}
+          ${a.risk_score ? `<div class="alert-meta-item">Risk score: <span>${a.risk_score}/100</span></div>` : ''}
+          ${a.trigger_value ? `<div class="alert-meta-item">Trigger: <span>${a.trigger_value}</span></div>` : ''}
+          <div class="alert-meta-item">Time: <span>${timeAgo(a.created_at)}</span></div>
+          ${a.acknowledged ? `<div class="alert-meta-item" style="color:#2d6a2d">✓ Acknowledged by <span>${a.acknowledged_by||'unknown'}</span></div>` : ''}
         </div>
       </div>
-      <div style="font-size:10px;color:var(--muted);font-style:italic">Estimated</div>
-    </div>
-    <div style="font-size:12px;color:var(--muted);line-height:1.5">${iso.label}. ISO PPC ranges from 1 (best) to 10 (no coverage). Verify with ISO Mitigation for binding decisions.</div>
-  `;
+      <div class="alert-actions">
+        ${!a.acknowledged ? `<button class="btn btn-outline btn-sm" onclick="acknowledge('${a.id}')">Acknowledge</button>` : ''}
+        <button class="btn btn-outline btn-sm" onclick="window.open('index.html#${a.lat},${a.lng}','_blank')">View on map</button>
+      </div>
+    </div>`).join('');
 }
 
-// ── NEW: Tribal Social Feed ───────────────────────────────────────────────────
-async function fetchTribalSocialFeed(lat, lng, state) {
-  // Build contextual X/Twitter search URL and show simulated feed structure
-  // Real-time X API requires OAuth — we surface the search link + representative structure
-  const tribalAccounts = {
-    'AZ': ['@NavajoDEM','@HopiTribe','@WhiteMtnApache'],
-    'NM': ['@PuebloOfZuni','@MescaleroApache','@NavajoNation'],
-    'CA': ['@HoopaTribe','@YurokTribe','@RoundValleyTribes'],
-    'OR': ['@UmatillaTribe','@WarmSpringsTribe','@GrandRonde'],
-    'WA': ['@TulalipTribes','@LummiNation','@YakamaNation'],
-    'MT': ['@BlackfeetNation','@CrowNation','@FlatheadNation'],
-    'SD': ['@OglalaSioux','@StandingRock','@CheyenneRiver'],
-    'OK': ['@CherokeeNation','@ChickasawNation','@ChoctawNation'],
-    'MN': ['@LeechLakeBand','@RedLakeNation','@WhiteEarthNation'],
-    'ID': ['@NezPerceTribe','@CoeurDAleneTribe','@ShoshoneBannock'],
+async function acknowledge(id) {
+  const by = prompt('Your name:') || 'Unknown';
+  await sb(`alerts`, { filter:`id=eq.${id}`, method:'PATCH', prefer:'return=minimal',
+    body:{ acknowledged:true, acknowledged_by:by, acknowledged_at:new Date().toISOString() } });
+  await loadAlerts();
+}
+
+async function acknowledgeAll() {
+  const unacked = allAlerts.filter(a=>!a.acknowledged);
+  if (!unacked.length) return alert('No unacknowledged alerts.');
+  const by = prompt(`Acknowledge all ${unacked.length} alerts. Your name:`);
+  if (!by) return;
+  await Promise.all(unacked.map(a => sb('alerts', {
+    filter:`id=eq.${a.id}`, method:'PATCH', prefer:'return=minimal',
+    body:{ acknowledged:true, acknowledged_by:by, acknowledged_at:new Date().toISOString() }
+  })));
+  await loadAlerts();
+}
+
+async function triggerManualRun() {
+  alert('Automated monitoring runs every 6 hours via Supabase Edge Functions.\n\nTo trigger a manual run, go to your Supabase project → Edge Functions → monitor → Invoke.');
+}
+
+// ── File upload ───────────────────────────────────────────────────────────────
+function handleDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag'); }
+function handleDragLeave() { document.getElementById('upload-zone').classList.remove('drag'); }
+function handleDrop(e) { e.preventDefault(); handleDragLeave(); if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); }
+function handleFileSelect(e) { if(e.target.files[0]) processFile(e.target.files[0]); }
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const wb = XLSX.read(e.target.result, { type:'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    parsedRows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+    if (!parsedRows.length) { alert('No data found in file.'); return; }
+
+    detectedColumns = Object.keys(parsedRows[0]);
+    showColumnMapper();
+    document.getElementById('upload-zone').querySelector('.upload-zone-text').textContent = `✓ ${file.name} — ${parsedRows.length.toLocaleString()} rows`;
   };
+  reader.readAsArrayBuffer(file);
+}
 
-  const accounts = tribalAccounts[state] || ['@TribalEM','@NativeFireAlert','@IndianCountryToday'];
-  const searchTerms = `wildfire OR fire OR smoke OR evacuation OR emergency near:${lat},${lng}`;
-  const twitterSearchURL = `https://twitter.com/search?q=${encodeURIComponent(searchTerms)}&f=live`;
-  document.getElementById('social-search-link').href = twitterSearchURL;
-
-  // Representative feed items based on current conditions (contextual, not live)
-  // In production: replace with X API v2 filtered stream or Apify scraper
-  const feedItems = [
-    {
-      source: accounts[0] || '@TribalEM',
-      time: '2h ago',
-      text: `Fire weather watch in effect for the region. Community members advised to prepare go-bags and monitor local conditions. Check back for updates.`,
-      tag: 'fire', tagLabel: 'Fire weather'
-    },
-    {
-      source: 'Indian Country Today',
-      time: '4h ago',
-      text: `Tribal emergency management offices across the Southwest are on elevated alert as drought conditions worsen ahead of fire season.`,
-      tag: 'smoke', tagLabel: 'Regional'
-    },
-    {
-      source: accounts[1] || '@NativeFireAlert',
-      time: '6h ago',
-      text: `Reminder: IRWIN-registered prescribed burns are active in the area. These are controlled and permitted. Contact tribal forestry for details.`,
-      tag: 'safe', tagLabel: 'Prescribed burn'
-    }
+function showColumnMapper() {
+  const required = [
+    { field:'lat', label:'Latitude *', options:['lat','latitude','LAT','Latitude','y','Y'] },
+    { field:'lng', label:'Longitude *', options:['lng','lon','longitude','LON','LNG','Longitude','x','X'] },
+    { field:'address', label:'Street address', options:['address','Address','street','Street','cleaned addresses'] },
+    { field:'city', label:'City', options:['city','City'] },
+    { field:'state', label:'State', options:['state','State','st','ST'] },
+    { field:'zip', label:'ZIP code', options:['zip','ZIP','zipcode','postal_code','Zip'] },
+    { field:'tiv', label:'Total Insured Value', options:['tiv','TIV','total_insured_value','Total Insured Value','insured_value'] },
+    { field:'confidence', label:'Location confidence', options:['confidence','Confidence','location_confidence','conf'] },
+    { field:'policy_number', label:'Policy number', options:['policy_number','Policy Number','policy','Policy'] },
+    { field:'tribe', label:'Tribe / Nation', options:['tribe','Tribe','tribal_nation','nation'] },
+    { field:'location_type', label:'Location type', options:['location_type','Location Type','locationType','geocode_method'] },
   ];
 
-  return { feedItems, twitterSearchURL, accounts };
+  const html = required.map(r => {
+    const best = r.options.find(o => detectedColumns.includes(o)) || '';
+    const opts = ['(skip)', ...detectedColumns].map(c => `<option value="${c}" ${c===best?'selected':''}>${c}</option>`).join('');
+    return `<div class="col-map-row">
+      <div class="col-map-label">${r.label}</div>
+      <select class="col-map-select" id="map-${r.field}">${opts}</select>
+      ${best ? `<span style="font-size:10px;color:#2d6a2d">✓ auto-detected</span>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('col-map-rows').innerHTML = html;
+  document.getElementById('col-map-card').style.display = 'block';
 }
 
-function renderSocialFeed(socialData, state) {
-  document.getElementById('social-section').style.display = 'block';
-  const feed = document.getElementById('social-feed');
+async function uploadPortfolio() {
+  const mapping = ['lat','lng','address','city','state','zip','tiv','confidence','policy_number','tribe','location_type']
+    .reduce((acc, f) => { acc[f] = document.getElementById(`map-${f}`)?.value; return acc; }, {});
 
-  const tagColors = { fire:'tag-fire', evac:'tag-evac', smoke:'tag-smoke', safe:'tag-safe' };
+  if (!mapping.lat || mapping.lat === '(skip)' || !mapping.lng || mapping.lng === '(skip)') {
+    alert('Latitude and longitude columns are required.'); return;
+  }
 
-  feed.innerHTML = `
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid var(--border)">
-      Monitoring accounts: ${socialData.accounts.join(', ')} + fire hashtags
-    </div>
-    ${socialData.feedItems.map(item => `
-      <div class="social-item">
-        <div class="social-header">
-          <div class="social-source">${item.source}</div>
-          <div class="social-time">${item.time}</div>
-        </div>
-        <div class="social-text">${item.text}</div>
-        <span class="social-tag ${tagColors[item.tag]||'tag-smoke'}">${item.tagLabel}</span>
-      </div>
-    `).join('')}
-  `;
-}
+  const records = parsedRows.map(row => {
+    const out = {};
+    Object.entries(mapping).forEach(([field, col]) => { if (col && col !== '(skip)') out[field] = row[col]; });
+    return out;
+  });
 
-// ── Core scoring ──────────────────────────────────────────────────────────────
-function getDroughtScore(features) {
-  let maxDM = -1;
-  for (const f of features) if (f.properties?.DM !== undefined) maxDM = Math.max(maxDM, f.properties.DM);
-  const scores = [10,30,55,75,100];
-  const labels = ['D0 Abnormally dry','D1 Moderate drought','D2 Severe drought','D3 Extreme drought','D4 Exceptional drought'];
-  if (maxDM < 0) return { score: 5, label: 'No drought data available', dm: -1 };
-  return { score: scores[maxDM], label: labels[maxDM], dm: maxDM };
-}
+  const mode = document.getElementById('upload-mode').value;
+  const status = document.getElementById('upload-status');
+  const progressBar = document.getElementById('upload-progress-bar');
+  const progressFill = document.getElementById('upload-progress-fill');
 
-async function getVegScore(lat, lng) {
-  const state = await reverseGeoState(lat, lng);
-  const hi = ['CA','OR','WA','NV','AZ','NM','CO','UT','ID','MT','WY'];
-  const med = ['TX','OK','KS','NE','SD','ND','MN','FL'];
-  if (hi.includes(state)) return { score: 80, label: `High-risk vegetation zone (${state})`, state };
-  if (med.includes(state)) return { score: 50, label: `Moderate vegetation risk (${state})`, state };
-  return { score: 20, label: `Lower vegetation risk (${state||'unknown'})`, state: state||'?' };
-}
+  status.textContent = 'Uploading...';
+  progressBar.style.display = 'block';
+  progressFill.style.width = '30%';
 
-async function reverseGeoState(lat, lng) {
   try {
-    const r = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${API_KEY}`);
-    const d = await r.json();
-    if (d.results?.length) {
-      for (const c of (d.results[0]?.address_components||[]))
-        if (c.types.includes('administrative_area_level_1')) return c.short_name;
+    // Validate
+    const valid = [], errors = [];
+    records.forEach((r,i) => {
+      const lat = parseFloat(r.lat||r.latitude||r.LAT||r.Latitude);
+      const lng = parseFloat(r.lng||r.lon||r.longitude||r.LNG||r.LON||r.Longitude);
+      if (isNaN(lat)||isNaN(lng)) { errors.push(i+2); return; }
+      valid.push({
+        address: String(r.address||r.Address||r['cleaned addresses']||'').trim(),
+        city: String(r.city||r.City||'').trim(),
+        state: String(r.state||r.State||'').trim().toUpperCase().substring(0,2),
+        zip: String(r.zip||r.ZIP||r.zipcode||'').trim(),
+        lat, lng,
+        tiv: parseFloat(r.tiv||r.TIV||r['Total Insured Value']||0)||null,
+        confidence: parseFloat(r.confidence||r.Confidence||0)||null,
+        policy_number: String(r.policy_number||r['Policy Number']||'').trim()||null,
+        tribe: String(r.tribe||r.Tribe||'').trim()||null,
+        location_type: String(r.location_type||r['Location Type']||'').trim()||null,
+      });
+    });
+    // If replace mode, delete existing
+    if (mode === 'replace') {
+      await sb('portfolio', { filter:'id=neq.00000000-0000-0000-0000-000000000000', method:'DELETE', prefer:'return=minimal' });
     }
-  } catch(e) {}
-  // Fallback: Nominatim reverse geocode
-  try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: {'User-Agent':'AMERIND-WildfireRisk/1.0'} });
-    const d = await r.json();
-    return d.address?.state_code?.toUpperCase() || d.address?.state?.substring(0,2).toUpperCase() || '';
-  } catch(e) {}
-  return '';
-}
-
-function getWUIScore(lat, lng) {
-  if (lng < -100) return { score: 72, label: 'High WUI density — western region' };
-  if (lng < -85) return { score: 45, label: 'Moderate WUI exposure' };
-  return { score: 22, label: 'Lower WUI exposure — eastern region' };
-}
-
-function getFireScore(count) {
-  if (count >= 3) return { score: 90, label: `${count} active fire perimeters nearby` };
-  if (count === 2) return { score: 70, label: '2 active fire perimeters nearby' };
-  if (count === 1) return { score: 55, label: '1 active fire perimeter nearby' };
-  return { score: 12, label: 'No active perimeters in region' };
-}
-
-function getInfraScore(iso) {
-  // Now uses ISO PPC estimate instead of heuristic
-  const ppcMap = {'2–3':20,'4–5':45,'5–6':55,'8–9':80,'?':50};
-  const score = ppcMap[iso.ppc] || 50;
-  return { score, label: `ISO PPC est. ${iso.ppc} — ${iso.label}` };
-}
-
-function compositeScore(f) {
-  return Math.round(f.drought.score*0.30 + f.veg.score*0.20 + f.wui.score*0.20 + f.fire.score*0.20 + f.infra.score*0.10);
-}
-
-function riskStyle(score) {
-  if (score >= 75) return { label: 'Critical', color: '#8b0000' };
-  if (score >= 55) return { label: 'High', color: '#c4420a' };
-  if (score >= 35) return { label: 'Moderate', color: '#b07a00' };
-  if (score >= 15) return { label: 'Low-moderate', color: '#5a7a3a' };
-  return { label: 'Low', color: '#2d6a2d' };
-}
-
-function barColor(s) {
-  if (s >= 75) return '#c4420a';
-  if (s >= 50) return '#e07b00';
-  if (s >= 25) return '#d4a017';
-  return '#4a8f4a';
-}
-
-function renderResults(score, factors, addr, wx) {
-  const rs = riskStyle(score);
-  currentResult = { score, factors, addr, rs, wx, timestamp: new Date() };
-
-  const banner = document.getElementById('risk-banner');
-  banner.classList.add('visible');
-  document.getElementById('risk-score-num').textContent = score;
-  document.getElementById('risk-score-num').style.color = rs.color;
-  document.getElementById('risk-label-text').textContent = rs.label;
-  document.getElementById('risk-label-text').style.color = rs.color;
-  document.getElementById('risk-addr').textContent = addr;
-  document.getElementById('risk-meter-fill').style.width = score + '%';
-  document.getElementById('risk-meter-fill').style.background = rs.color;
-  document.getElementById('pdf-btn').disabled = false;
-
-  document.getElementById('meta-row').innerHTML = `
-    <div class="meta-item">Assessed: <span>${new Date().toLocaleString()}</span></div>
-    <div class="meta-item">State: <span>${factors.veg.state||'—'}</span></div>
-    <div class="meta-item">Drought: <span>${factors.drought.dm>=0?'D'+factors.drought.dm:'None'}</span></div>
-    ${wx ? `<div class="meta-item">Humidity: <span>${wx.humidity}%</span></div>` : ''}
-  `;
-
-  const factorData = [
-    { name:'Drought severity', weight:'30%', score:factors.drought.score, sub:factors.drought.label },
-    { name:'Vegetation type', weight:'20%', score:factors.veg.score, sub:factors.veg.label },
-    { name:'WUI proximity', weight:'20%', score:factors.wui.score, sub:factors.wui.label },
-    { name:'Fire history', weight:'20%', score:factors.fire.score, sub:factors.fire.label },
-    { name:'Response capacity (ISO)', weight:'10%', score:factors.infra.score, sub:factors.infra.label },
-  ];
-
-  document.getElementById('factor-list').innerHTML = factorData.map(f => `
-    <div class="factor-row">
-      <div class="factor-header">
-        <div class="factor-name">${f.name} <span style="font-size:10px;color:var(--muted);font-weight:400">${f.weight}</span></div>
-        <div class="factor-score-num" style="color:${barColor(f.score)}">${f.score}</div>
-      </div>
-      <div class="factor-sub">${f.sub}</div>
-      <div class="factor-bar"><div class="factor-bar-fill" style="width:${f.score}%;background:${barColor(f.score)}"></div></div>
-    </div>
-  `).join('');
-
-  document.getElementById('factors-card').classList.add('visible');
-}
-
-function clearResults() {
-  document.getElementById('risk-banner').classList.remove('visible');
-  document.getElementById('factors-card').classList.remove('visible');
-  document.getElementById('redflag-banner').classList.remove('visible');
-  document.getElementById('weather-strip').classList.remove('visible');
-  document.getElementById('social-section').style.display = 'none';
-  document.getElementById('iso-card').style.display = 'none';
-  if (marker) { map.removeLayer(marker); marker = null; }
-  if (droughtLayer) { map.removeLayer(droughtLayer); droughtLayer = null; }
-  if (fireLayer) { map.removeLayer(fireLayer); fireLayer = null; }
-  setStatus('Enter a property address to generate a wildfire risk assessment.');
-  currentResult = null;
-  document.getElementById('pdf-btn').disabled = true;
-}
-
-async function runSearch() {
-  const addr = document.getElementById('addr').value.trim();
-  if (!addr) return;
-  document.getElementById('assess-btn').disabled = true;
-  clearResults();
-  setStatus('Geocoding address...', true);
-
-  try {
-    let lat, lng, fmtAddr;
-
-    // Try Google Maps first
-    try {
-      const geo = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addr)}&key=${API_KEY}`);
-      const gd = await geo.json();
-      if (gd.status === 'REQUEST_DENIED' || gd.status === 'INVALID_REQUEST') {
-        throw new Error(`Google Maps API: ${gd.status} — ${gd.error_message || 'check API key restrictions in Google Cloud Console'}`);
-      }
-      if (gd.results?.length) {
-        lat = gd.results[0].geometry.location.lat;
-        lng = gd.results[0].geometry.location.lng;
-        fmtAddr = gd.results[0].formatted_address;
-      }
-    } catch(geoErr) {
-      console.warn('Google geocode failed, trying Nominatim fallback:', geoErr.message);
-      setStatus('Google Maps unavailable, trying OpenStreetMap geocoder...', true);
-      // Fallback: Nominatim (OpenStreetMap) — free, no key, CORS-enabled
-      const nomUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&countrycodes=us`;
-      const nr = await fetch(nomUrl, { headers: { 'Accept-Language': 'en', 'User-Agent': 'AMERIND-WildfireRisk/1.0' } });
-      const nd = await nr.json();
-      if (!nd?.length) {
-        setStatus(`Address not found. Check the address and try again.`);
-        document.getElementById('assess-btn').disabled = false;
-        return;
-      }
-      lat = parseFloat(nd[0].lat);
-      lng = parseFloat(nd[0].lon);
-      fmtAddr = nd[0].display_name;
+    // Insert in chunks of 500
+    const CHUNK = 500;
+    let inserted = 0;
+    for (let i=0; i<valid.length; i+=CHUNK) {
+      await sb('portfolio', { method:'POST', prefer:'return=minimal', body: valid.slice(i,i+CHUNK) });
+      inserted += Math.min(CHUNK, valid.length-i);
+      progressFill.style.width = Math.round(inserted/valid.length*100)+'%';
     }
+    status.textContent = `✓ ${inserted.toLocaleString()} properties uploaded${errors.length ? `, ${errors.length} skipped` : ''}.`;
+    await loadStats();
+  } catch(e) {
+    status.textContent = `Upload failed: ${e.message}`;
+  }
+}
 
-    if (!lat || !lng) {
-      setStatus('Address not found. Try adding city and state.');
-      document.getElementById('assess-btn').disabled = false;
+// ── Portfolio table ───────────────────────────────────────────────────────────
+async function loadPortfolioTable() {
+  try {
+    const props = await sb('portfolio', {
+      filter:'order=last_risk_score.desc.nullslast&limit=500',
+      select:'address,city,state,tiv,confidence,location_type,last_risk_score,tribe'
+    });
+
+    if (!props?.length) {
+      document.getElementById('portfolio-table-wrap').innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>No properties loaded yet.</div>';
       return;
     }
 
-    setStatus('Loading all risk data...', true);
-    initMap(lat, lng);
-    if (marker) map.removeLayer(marker);
-    marker = L.marker([lat,lng]).addTo(map).bindPopup(`<b>${fmtAddr}</b>`).openPopup();
-
-    // Fetch everything in parallel
-    const [droughtFeatures, fireCount, vegData, wxData, redFlag] = await Promise.all([
-      addDroughtLayer(lat, lng),
-      addFireLayer(lat, lng),
-      getVegScore(lat, lng),
-      fetchWeather(lat, lng),
-      fetchRedFlagWarnings(lat, lng),
-    ]);
-
-    const state = vegData.state;
-    const [isoData, socialData] = await Promise.all([
-      getISOClass(lat, lng, state),
-      fetchTribalSocialFeed(lat, lng, state),
-    ]);
-
-    // Render new features
-    const wx = renderWeather(wxData);
-    renderRedFlag(redFlag);
-    renderISO(isoData);
-    renderSocialFeed(socialData, state);
-
-    const factors = {
-      drought: getDroughtScore(droughtFeatures),
-      veg: vegData,
-      wui: getWUIScore(lat, lng),
-      fire: getFireScore(fireCount),
-      infra: getInfraScore(isoData),
-    };
-
-    const score = compositeScore(factors);
-    setStatus(`Assessment complete — ${fmtAddr}`);
-    renderResults(score, factors, fmtAddr, wx);
-
+    const maxTIV = Math.max(...props.map(p=>p.tiv||0));
+    document.getElementById('portfolio-table-wrap').innerHTML = `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Showing top 500 by risk score</div>
+      <table class="portfolio-table">
+        <thead><tr>
+          <th>Address</th><th>State</th><th>Tribe</th>
+          <th>TIV</th><th>Confidence</th><th>Location type</th><th>Risk score</th>
+        </tr></thead>
+        <tbody>${props.map(p => {
+          const conf = p.confidence || 0;
+          const confClass = conf >= 85 ? 'conf-high' : conf >= 60 ? 'conf-med' : 'conf-low';
+          const riskColor = !p.last_risk_score ? '#ccc' : p.last_risk_score>=75?'var(--critical)':p.last_risk_score>=55?'var(--high)':p.last_risk_score>=35?'var(--moderate)':'var(--low)';
+          const tivPct = maxTIV ? Math.round((p.tiv||0)/maxTIV*100) : 0;
+          return `<tr>
+            <td>${p.address||'—'}${p.city?`, ${p.city}`:''}</td>
+            <td>${p.state||'—'}</td>
+            <td>${p.tribe||'—'}</td>
+            <td>${p.tiv?'$'+Math.round(p.tiv/1000)+'K':'—'}
+              ${p.tiv?`<div class="tiv-bar"><div class="tiv-bar-fill" style="width:${tivPct}%"></div></div>`:''}
+            </td>
+            <td>${conf?`<span class="conf-badge ${confClass}">${conf}%</span>`:'—'}</td>
+            <td style="font-size:10px;color:var(--muted)">${p.location_type||'—'}</td>
+            <td style="font-family:var(--mono);font-weight:500;color:${riskColor}">${p.last_risk_score||'—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
   } catch(e) {
-    setStatus('Error: ' + e.message);
-    console.error(e);
+    document.getElementById('portfolio-table-wrap').innerHTML = '<div class="empty-state">Could not load portfolio. Check Supabase keys in settings.</div>';
   }
-  document.getElementById('assess-btn').disabled = false;
 }
 
-// ── PDF Export ────────────────────────────────────────────────────────────────
-function exportPDF() {
-  if (!currentResult) return;
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'pt', format:'letter' });
-  const { score, factors, addr, rs, wx, timestamp } = currentResult;
-  const W = 612, M = 48, CW = W - M*2;
+// ── Moratorium weight sliders ─────────────────────────────────────────────────
+// NEW SCORING MODEL — 8 factors including containment, growth rate, policy count
+// Weights must total 100. Containment + growth are forward-looking escalators.
+const WEIGHT_IDS = ['fire','containment','growth','tiv','policy','wx','drought','topo'];
+const WEIGHT_DEFAULTS = {fire:20, containment:22, growth:18, tiv:14, policy:10, wx:10, drought:4, topo:2};
+const TIER_DEFAULTS = {watch:30,warning:55,mora:75};
 
-  // ── Header ──
-  doc.setFillColor(26,24,20); doc.rect(0,0,W,60,'F');
-  doc.setFillColor(196,66,10); doc.rect(0,0,5,60,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(16); doc.setFont('helvetica','bold');
-  doc.text('AMERIND Risk', M, 26);
-  doc.setFontSize(10); doc.setFont('helvetica','normal');
-  doc.text('Wildfire Risk Assessment Report', M, 42);
-  doc.setTextColor(160,150,140); doc.setFontSize(9);
-  doc.text(timestamp.toLocaleString(), W-M, 38, {align:'right'});
+// Sample territory: 200ac fire, 0% contained, growing fast, $500K TIV, 3 policies,
+// red flag active, D2 drought, moderate terrain
+const SAMPLE = {fire:70, containment:100, growth:80, tiv:55, policy:40, wx:100, drought:50, topo:50};
 
-  // ── Risk score block ──
-  const riskColors = {'Critical':[139,0,0],'High':[196,66,10],'Moderate':[176,122,0],'Low-moderate':[90,122,58],'Low':[45,106,45]};
-  const rc = riskColors[rs.label] || [100,100,100];
-  let y = 74;
-  doc.setFillColor(...rc);
-  doc.roundedRect(M, y, CW, 68, 6, 6, 'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(46); doc.setFont('helvetica','bold');
-  doc.text(String(score), M+18, y+50);
-  doc.setFontSize(22); doc.setFont('helvetica','normal');
-  doc.text(rs.label + ' Wildfire Risk', M+90, y+30);
-  doc.setFontSize(10);
-  const addrLines = doc.splitTextToSize(addr, CW-110);
-  doc.text(addrLines, M+90, y+46);
-
-  // ── Score bar ──
-  y += 76;
-  doc.setFillColor(220,215,208); doc.roundedRect(M, y, CW, 7, 3, 3, 'F');
-  doc.setFillColor(...rc); doc.roundedRect(M, y, Math.round(CW*score/100), 7, 3, 3, 'F');
-
-  // ── Weather row ──
-  y += 16;
-  if (wx) {
-    doc.setFillColor(245,243,238); doc.roundedRect(M, y, CW, 32, 4, 4, 'F');
-    doc.setTextColor(80,75,70); doc.setFontSize(8); doc.setFont('helvetica','bold');
-    doc.text('CURRENT CONDITIONS', M+10, y+11);
-    doc.setFont('helvetica','normal'); doc.setTextColor(26,24,20); doc.setFontSize(10);
-    const wxItems = [`${wx.temp}°F`, `${wx.humidity}% RH`, `${wx.wind} mph wind`, `${wx.gust} mph gusts`];
-    const wxLabels = ['Temperature','Humidity','Wind','Gusts'];
-    const colW = CW / 4;
-    wxItems.forEach((val, i) => {
-      const x = M + i*colW + colW/2;
-      doc.setFont('helvetica','bold'); doc.setFontSize(11);
-      doc.text(val, x, y+24, {align:'center'});
-    });
-    y += 42;
-  }
-
-  // ── Section: Factor breakdown ──
-  y += 10;
-  doc.setTextColor(100,96,92); doc.setFontSize(8); doc.setFont('helvetica','bold');
-  doc.text('FACTOR BREAKDOWN', M, y+1);
-  doc.setDrawColor(210,205,198); doc.setLineWidth(0.5);
-  doc.line(M, y+5, W-M, y+5);
-  y += 16;
-
-  const factorData = [
-    {name:'Drought Severity',    weight:'30%', score:factors.drought.score, sub:factors.drought.label},
-    {name:'Vegetation Type',     weight:'20%', score:factors.veg.score,     sub:factors.veg.label},
-    {name:'WUI Proximity',       weight:'20%', score:factors.wui.score,     sub:factors.wui.label},
-    {name:'Fire History',        weight:'20%', score:factors.fire.score,    sub:factors.fire.label},
-    {name:'Response Cap. (ISO)', weight:'10%', score:factors.infra.score,   sub:factors.infra.label},
-  ];
-
-  function fBarColor(s) {
-    if (s>=75) return [196,66,10];
-    if (s>=50) return [224,123,0];
-    if (s>=25) return [212,160,23];
-    return [74,143,74];
-  }
-
-  const ROW = 46;
-  factorData.forEach(f => {
-    // Row background
-    doc.setFillColor(248,246,242);
-    doc.roundedRect(M, y, CW, ROW, 4, 4, 'F');
-
-    // Score badge (right side)
-    const bc = fBarColor(f.score);
-    doc.setFillColor(bc[0], bc[1], bc[2]);
-    doc.roundedRect(W-M-36, y+8, 30, 20, 4, 4, 'F');
-    doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.text(String(f.score), W-M-21, y+22, {align:'center'});
-
-    // Factor name + weight
-    doc.setTextColor(26,24,20); doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.text(f.name, M+10, y+16);
-    doc.setTextColor(140,135,128); doc.setFontSize(8); doc.setFont('helvetica','normal');
-    doc.text(f.weight, M+10, y+27);
-
-    // Sub-label (truncated to fit)
-    const subText = doc.splitTextToSize(f.sub, CW-60)[0];
-    doc.setTextColor(120,115,108); doc.setFontSize(8);
-    doc.text(subText, M+10, y+37);
-
-    // Progress bar
-    doc.setFillColor(220,215,208);
-    doc.roundedRect(M+10, y+ROW-8, CW-56, 4, 2, 2, 'F');
-    doc.setFillColor(...bc);
-    doc.roundedRect(M+10, y+ROW-8, Math.round((CW-56)*f.score/100), 4, 2, 2, 'F');
-
-    y += ROW + 6;
+function updateWeights() {
+  let total = 0;
+  WEIGHT_IDS.forEach(id => {
+    const v = parseInt(document.getElementById('w-'+id).value);
+    document.getElementById('wv-'+id).textContent = v + '%';
+    total += v;
   });
 
-  // ── Methodology ──
-  y += 6;
-  doc.setTextColor(100,96,92); doc.setFontSize(8); doc.setFont('helvetica','bold');
-  doc.text('METHODOLOGY', M, y);
-  doc.setDrawColor(210,205,198); doc.line(M, y+4, W-M, y+4);
-  y += 14;
-  doc.setFont('helvetica','normal'); doc.setTextColor(120,115,108); doc.setFontSize(8);
-  const note = 'Composite score: drought 30%, vegetation 20%, WUI proximity 20%, fire history 20%, response capacity/ISO 10%. Sources: NDMC Drought Monitor (weekly), WFIGS fire perimeters (YTD), NOAA NWS red flag warnings, Open-Meteo live weather, ISO PPC estimate. Verify ISO PPC directly for binding underwriting decisions.';
-  const noteLines = doc.splitTextToSize(note, CW);
-  doc.text(noteLines, M, y);
-  y += noteLines.length * 11 + 10;
+  // Total indicator — red if not 100
+  const totalEl = document.getElementById('weight-total');
+  totalEl.textContent = total + '%';
+  totalEl.style.color = total === 100 ? 'var(--low)' : total > 100 ? 'var(--critical)' : 'var(--moderate)';
 
-  // ── Disclaimer box ──
-  doc.setFillColor(245,243,238);
-  doc.roundedRect(M, y, CW, 30, 4, 4, 'F');
-  doc.setFontSize(8); doc.setTextColor(140,130,120);
-  doc.text('FOR UNDERWRITING USE ONLY — Based on publicly available data. Not a substitute for on-site inspection', M+10, y+12);
-  doc.text('or certified fire risk evaluation. Local conditions may vary significantly.', M+10, y+22);
+  // Update tier threshold labels
+  ['watch','warning','mora'].forEach(t => {
+    document.getElementById('tv-'+t).textContent = document.getElementById('t-'+t).value;
+  });
 
-  // ── Footer ──
-  doc.setFillColor(26,24,20); doc.rect(0,748,W,44,'F');
-  doc.setTextColor(160,150,140); doc.setFontSize(8); doc.setFont('helvetica','normal');
-  doc.text('AMERIND Risk — Tribally Owned and Operated Insurance', M, 768);
-  doc.text(`Generated ${timestamp.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`, W-M, 768, {align:'right'});
+  // Enforce tier order
+  const watch = parseInt(document.getElementById('t-watch').value);
+  const warning = parseInt(document.getElementById('t-warning').value);
+  const mora = parseInt(document.getElementById('t-mora').value);
+  if (warning <= watch) document.getElementById('t-warning').value = watch + 1;
+  if (mora <= warning) document.getElementById('t-mora').value = warning + 1;
 
-  const safeName = addr.replace(/[^a-z0-9]/gi,'_').substring(0,40);
-  doc.save(`AMERIND_Wildfire_Risk_${safeName}.pdf`);
+  renderTierPreview();
+  renderMoratoriumPreview();
 }
 
-window.addEventListener('load', () => { initMap(38.5, -96); });
+function renderTierPreview() {
+  const watch = parseInt(document.getElementById('t-watch').value);
+  const warning = parseInt(document.getElementById('t-warning').value);
+  const mora = parseInt(document.getElementById('t-mora').value);
+  document.getElementById('tier-preview').innerHTML = `
+    <div class="tier-pip" style="background:#EAF3DE;border-color:#3B6D11">
+      <div class="tier-pip-name" style="color:#27500A">Watch</div>
+      <div class="tier-pip-range" style="color:#3B6D11">${watch}–${warning-1}</div>
+      <div class="tier-pip-action">Flag for review. No binding restriction.</div>
+    </div>
+    <div class="tier-pip" style="background:#FAEEDA;border-color:#854F0B">
+      <div class="tier-pip-name" style="color:#633806">Warning</div>
+      <div class="tier-pip-range" style="color:#854F0B">${warning}–${mora-1}</div>
+      <div class="tier-pip-action">Restrict new business. Senior sign-off on renewals.</div>
+    </div>
+    <div class="tier-pip" style="background:#FCEBEB;border-color:#A32D2D">
+      <div class="tier-pip-name" style="color:#791F1F">Moratorium</div>
+      <div class="tier-pip-range" style="color:#A32D2D">${mora}–100</div>
+      <div class="tier-pip-action">Full suspension. Notify leadership immediately.</div>
+    </div>`;
+}
+
+function renderMoratoriumPreview() {
+  const watch = parseInt(document.getElementById('t-watch').value);
+  const warning = parseInt(document.getElementById('t-warning').value);
+  const mora = parseInt(document.getElementById('t-mora').value);
+
+  // Calculate score using current weights against sample territory
+  let score = 0;
+  let total = 0;
+  WEIGHT_IDS.forEach(id => {
+    const w = parseInt(document.getElementById('w-'+id).value);
+    total += w;
+    score += (SAMPLE[id] || 0) * (w / 100);
+  });
+  // Normalize if weights don't sum to 100
+  if (total > 0 && total !== 100) score = score * (100 / total);
+  score = Math.round(score);
+
+  let tier, tierColor, bg, border, action;
+  if (score >= mora) {
+    tier = 'Moratorium recommended';
+    tierColor = '#791F1F'; bg = '#FCEBEB'; border = '#A32D2D';
+    action = 'Suspend all new business and renewals. Notify leadership.';
+  } else if (score >= warning) {
+    tier = 'Warning — restrict new business';
+    tierColor = '#633806'; bg = '#FAEEDA'; border = '#854F0B';
+    action = 'Restrict new submissions. Renewals need senior sign-off.';
+  } else if (score >= watch) {
+    tier = 'Watch — elevated monitoring';
+    tierColor = '#27500A'; bg = '#EAF3DE'; border = '#3B6D11';
+    action = 'Flag new submissions for underwriter review.';
+  } else {
+    tier = 'No action required';
+    tierColor = 'var(--muted)'; bg = 'var(--surface)'; border = 'var(--border)';
+    action = 'Continue routine monitoring.';
+  }
+
+  const preview = document.getElementById('mora-preview');
+  preview.style.background = bg;
+  preview.style.borderColor = border;
+  document.getElementById('preview-score').textContent = score;
+  document.getElementById('preview-score').style.color = tierColor;
+  document.getElementById('preview-tier').textContent = tier;
+  document.getElementById('preview-tier').style.color = tierColor;
+  document.getElementById('preview-action').textContent = action;
+}
+
+function resetWeights() {
+  WEIGHT_IDS.forEach(id => {
+    document.getElementById('w-'+id).value = WEIGHT_DEFAULTS[id];
+  });
+  document.getElementById('t-watch').value = TIER_DEFAULTS.watch;
+  document.getElementById('t-warning').value = TIER_DEFAULTS.warning;
+  document.getElementById('t-mora').value = TIER_DEFAULTS.mora;
+  updateWeights();
+}
+
+async function saveMoratoriumWeights() {
+  const total = WEIGHT_IDS.reduce((s,id) => s + parseInt(document.getElementById('w-'+id).value), 0);
+  if (total !== 100) {
+    document.getElementById('mora-save-status').textContent = `Weights must total 100% (currently ${total}%)`;
+    document.getElementById('mora-save-status').style.color = 'var(--critical)';
+    return;
+  }
+  const weights = {};
+  WEIGHT_IDS.forEach(id => weights['mora_w_'+id] = parseInt(document.getElementById('w-'+id).value));
+  weights.mora_t_watch = parseInt(document.getElementById('t-watch').value);
+  weights.mora_t_warning = parseInt(document.getElementById('t-warning').value);
+  weights.mora_t_mora = parseInt(document.getElementById('t-mora').value);
+
+  const [mcfg] = await sb('alert_config', { filter:'is_global_default=eq.true&limit=1' });
+  if (mcfg?.id) await sb('alert_config', { filter:`id=eq.${mcfg.id}`, method:'PATCH', prefer:'return=minimal', body:weights });
+  const s = document.getElementById('mora-save-status');
+  s.textContent = '✓ Moratorium model saved';
+  s.style.color = 'var(--low)';
+  setTimeout(() => s.textContent = '', 3000);
+}
+
+function loadMoratoriumWeights(config) {
+  if (!config) return;
+  WEIGHT_IDS.forEach(id => {
+    const val = config['mora_w_'+id];
+    if (val !== undefined) document.getElementById('w-'+id).value = val;
+  });
+  if (config.mora_t_watch) document.getElementById('t-watch').value = config.mora_t_watch;
+  if (config.mora_t_warning) document.getElementById('t-warning').value = config.mora_t_warning;
+  if (config.mora_t_mora) document.getElementById('t-mora').value = config.mora_t_mora;
+  updateWeights();
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const [[config], recipients, runs] = await Promise.all([
+      sb('alert_config', { filter:'is_global_default=eq.true&limit=1' }),
+      sb('recipients', { filter:'order=created_at.asc' }),
+      sb('monitor_runs', { filter:'order=started_at.desc&limit=10' }),
+    ]);
+
+    if (config) {
+      document.getElementById('cfg-fire-miles').value = config.fire_proximity_miles || 25;
+      document.getElementById('cfg-risk-threshold').value = config.risk_score_threshold || 65;
+      document.getElementById('cfg-drought').checked = config.drought_change_trigger !== false;
+      document.getElementById('cfg-redflag').checked = config.red_flag_trigger !== false;
+      document.getElementById('cfg-topo').checked = config.topo_fire_trigger !== false;
+      loadMoratoriumWeights(config);
+    } else {
+      updateWeights(); // init with defaults
+    }
+
+    if (runs?.length) {
+      const last = runs[0];
+      document.getElementById('cfg-last-run').textContent = new Date(last.started_at).toLocaleString();
+      const nextRun = new Date(new Date(last.started_at).getTime() + 6*3600000);
+      document.getElementById('cfg-next-run').textContent = nextRun.toLocaleString();
+      document.getElementById('run-log').innerHTML = runs.map(r => `
+        <div class="run-log-item">
+          <span class="run-status ${r.status}">${r.status}</span>
+          <span style="color:var(--muted)">${new Date(r.started_at).toLocaleString()}</span>
+          <span>${r.properties_checked||0} checked</span>
+          <span style="color:var(--accent)">${r.alerts_generated||0} alerts</span>
+        </div>`).join('');
+    } else {
+      document.getElementById('run-log').innerHTML = '<div style="font-size:12px;color:var(--muted)">No runs yet.</div>';
+    }
+
+    renderRecipients(recipients || []);
+  } catch(e) {
+    console.warn('Config load failed:', e);
+    updateWeights(); // init sliders even if API fails
+  }
+}
+
+async function saveConfig() {
+  const body = {
+    fire_proximity_miles: parseFloat(document.getElementById('cfg-fire-miles').value),
+    risk_score_threshold: parseInt(document.getElementById('cfg-risk-threshold').value),
+    drought_change_trigger: document.getElementById('cfg-drought').checked,
+    red_flag_trigger: document.getElementById('cfg-redflag').checked,
+    topo_fire_trigger: document.getElementById('cfg-topo').checked,
+  };
+  const [cfg] = await sb('alert_config', { filter:'is_global_default=eq.true&limit=1' });
+  if (cfg?.id) await sb(`alert_config`, { filter:`id=eq.${cfg.id}`, method:'PATCH', prefer:'return=minimal', body });
+  const btn = event.target; btn.textContent = '✓ Saved'; setTimeout(()=>btn.textContent='Save thresholds', 2000);
+}
+
+function renderRecipients(recipients) {
+  const el = document.getElementById('recipient-list');
+  if (!recipients.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted)">No recipients configured.</div>'; return; }
+  el.innerHTML = recipients.map(r => `
+    <div class="recipient-row">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500">${r.name}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.email} &middot; ${r.role}</div>
+      </div>
+      <label class="toggle"><input type="checkbox" ${r.active?'checked':''} onchange="toggleRecipient('${r.id}',this.checked)"><span class="toggle-slider"></span></label>
+      <button class="btn btn-danger btn-sm" onclick="deleteRecipient('${r.id}')">Remove</button>
+    </div>`).join('');
+}
+
+async function addRecipient() {
+  const name = document.getElementById('new-name').value.trim();
+  const email = document.getElementById('new-email').value.trim();
+  const role = document.getElementById('new-role').value;
+  if (!name || !email) { alert('Name and email required.'); return; }
+  await sb('recipients', { method:'POST', body:{name,email,role} });
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-email').value = '';
+  loadConfig();
+}
+
+async function deleteRecipient(id) {
+  if (!confirm('Remove this recipient?')) return;
+  await sb(`recipients`, { filter:`id=eq.${id}`, method:'DELETE', prefer:'return=minimal' });
+  loadConfig();
+}
+
+async function toggleRecipient(id, active) {
+  await sb('recipients', { filter:`id=eq.${id}`, method:'PATCH', prefer:'return=minimal', body:{active} });
+}
+
+// ── Moratorium Decision Matrix ────────────────────────────────────────────────
+
+let moraCases = [];
+let moraFilter = 'all';
+
+function moraParseEmail(text) {
+  const get = (re) => { const m = text.match(re); return m ? m[1].trim() : null; };
+  const nameMatch = text.match(/^([^\n(]+)\s*\(([^)]+)\)/m);
+  const fireName  = nameMatch ? nameMatch[1].trim() : (get(/Fire Name[:\s]+([^\n]+)/i) || 'Unknown Fire');
+  const fireId    = nameMatch ? nameMatch[2].trim() : (get(/\((\d{4}-[A-Z]+-\d+)\)/) || ('LOCAL-' + Date.now()));
+  const coordMatch= text.match(/Coordinates:\s*([\d.-]+),\s*([\d.-]+)/i);
+  const acresMatch= text.match(/Fire Size[:\s]+([\d,]+)\s*Acres/i);
+  const polMatch  = text.match(/There (?:is|are)\s+(\d+)\s+within/i);
+  const tivMatch  = text.match(/TIV[:\s]+\$?([\d,]+)/i);
+  const triMatch  = text.match(/Tribal Affiliations?[:\s]+([^\n]+)/i);
+  const conRaw    = get(/Containment[:\s]+([^\n]+)/i);
+  // Full weather line — critical for red flag and wind detection
+  const wxMatch   = text.match(/(?:MOSTLY|PARTLY|CLEAR|SUNNY|CLOUDY|OVERCAST|FOG|RAIN|THUNDER)[^\n]*/i)
+                 || text.match(/Temperature[^\n]*/i);
+  const wxRaw     = wxMatch ? wxMatch[0].trim() : '';
+  // Distance from insured — parse miles from location description
+  const distMatch = text.match(/(\d+\.?\d*)\s*Miles?\s+[NSEW]/i);
+  const distMiles = distMatch ? parseFloat(distMatch[1]) : null;
+  // Red flag explicit mention
+  const redFlag   = /red flag|fire weather watch|fire weather warning/i.test(text);
+  const closestRaw= get(/Closest[:\s]+([^\n]+)/i);
+
+  return {
+    fire_id:            fireId,
+    fire_name:          fireName,
+    location_description: get(/(\d+\.?\d*\s+Miles?\s+[NSEW\s]+of\s+[^\n]+)/i) || '',
+    dist_miles:         distMiles,
+    lat: coordMatch ? parseFloat(coordMatch[1]) : null,
+    lng: coordMatch ? parseFloat(coordMatch[2]) : null,
+    acres: acresMatch ? parseInt(acresMatch[1].replace(',','')) : 0,
+    fire_type: get(/Fire Type[:\s]+([^\n]+)/i) || 'Wildfire',
+    containment_pct: (!conRaw || conRaw.toLowerCase()==='unknown') ? null : parseInt(conRaw),
+    policy_count: polMatch ? parseInt(polMatch[1]) : 0,
+    tiv_exposed: tivMatch ? parseFloat(tivMatch[1].replace(/,/g,'')) : 0,
+    tribal_affiliation: triMatch ? triMatch[1].trim() : 'Unknown',
+    closest_property: closestRaw || '',
+    postal_codes: get(/Postal Codes?[:\s]+([\d,\s]+)/i) || '',
+    weather_summary: wxRaw,
+    red_flag_active: redFlag,
+    alert_count: 1, // increments on repeat alerts for same fire_id
+    alert_source: 'rzalert',
+    received_at: new Date().toISOString(),
+    decision: null, decision_by: '', decision_note: '', decision_at: null,
+    raw_text: text
+  };
+}
+
+function moraTierScore(a) {
+  // ── Factor scores (each 0–100, weighted below) ───────────────────────────
+  let factors = {};
+
+  // 1. FIRE SIZE — acres as forward risk proxy
+  const ac = a.acres || 0;
+  factors.fire = ac >= 10000 ? 100 : ac >= 1000 ? 80 : ac >= 500 ? 60 :
+                 ac >= 100  ? 35  : ac >= 50   ? 20  : ac > 0 ? 10 : 0;
+
+  // 2. CONTAINMENT — forward-looking; 0%/unknown is worst case
+  //    Null = unknown = treat as 0% (most conservative)
+  const con = a.containment_pct;
+  factors.containment = (con === null || con === undefined) ? 95 :
+                        con === 0   ? 100 : con <= 10 ? 90 : con <= 25 ? 75 :
+                        con <= 50   ? 50  : con <= 75 ? 25 : 10;
+
+  // 3. GROWTH RATE — alerts_count on same fire_id = trajectory signal
+  //    If unknown default to moderate; escalates hard with repeat alerts
+  const alertCount = a.alert_count || 1;
+  factors.growth = alertCount >= 5 ? 100 : alertCount >= 4 ? 85 :
+                   alertCount >= 3 ? 65  : alertCount >= 2 ? 40 : 15;
+
+  // 4. TIV EXPOSED — total insured value within proximity
+  const t = a.tiv_exposed || 0;
+  factors.tiv = t >= 10000000 ? 100 : t >= 5000000 ? 85 : t >= 2500000 ? 70 :
+                t >= 1000000  ? 55  : t >= 500000  ? 40 : t >= 100000  ? 20 :
+                t > 0         ? 10  : 0;
+
+  // 5. POLICY COUNT — concentration of insured units
+  const p = a.policy_count || 0;
+  factors.policy = p >= 20 ? 100 : p >= 10 ? 80 : p >= 5 ? 55 :
+                   p >= 3  ? 35  : p >= 1  ? 20  : 0;
+
+  // 6. WEATHER / RED FLAG — wind speed + humidity from weather summary
+  //    Parse wind speed from weather string; red flag keywords auto-max
+  const wx = (a.weather_summary || '').toUpperCase();
+  const windMatch = wx.match(/(\d+)\s*MPH/);
+  const windSpeed = windMatch ? parseInt(windMatch[1]) : 0;
+  const redFlag   = wx.includes('RED FLAG') || wx.includes('FIRE WEATHER') || a.red_flag_active;
+  const lowHumid  = wx.match(/(\d+)%\s*HUM/i);
+  const humidity  = lowHumid ? parseInt(lowHumid[1]) : 50;
+  factors.wx = redFlag ? 100 :
+               windSpeed >= 40 ? 90 : windSpeed >= 25 ? 70 :
+               windSpeed >= 15 ? 45 : humidity < 15   ? 60 :
+               humidity < 25   ? 40 : 15;
+
+  // 7. DROUGHT SEVERITY — D0–D4 scale from last_drought_dm
+  const dm = a.last_drought_dm || a.drought_dm || 0;
+  factors.drought = dm >= 4 ? 100 : dm >= 3 ? 75 : dm >= 2 ? 50 :
+                    dm >= 1 ? 25  : 0;
+
+  // 8. TERRAIN / TOPO — amplification factor (from portfolio scoring)
+  const topo = a.topo_score || a.last_topo_score || 0;
+  factors.topo = topo >= 80 ? 100 : topo >= 60 ? 70 : topo >= 40 ? 45 :
+                 topo >= 20 ? 25  : topo > 0 ? 10 : 20; // default 20 = unknown/moderate
+
+  // ── Weighted composite score ─────────────────────────────────────────────
+  const W = WEIGHT_DEFAULTS; // use live slider values if available via getWeights()
+  const weights = typeof getWeights === 'function' ? getWeights() : W;
+  let score = 0;
+  WEIGHT_IDS.forEach(id => { score += (factors[id] || 0) * ((weights[id] || 0) / 100); });
+  score = Math.round(score);
+
+  // ── HARD ESCALATION RULES — override score tier upward only ─────────────
+  // These catch the "benign score but catastrophic condition" edge cases
+  let tier = score >= TIER_DEFAULTS.mora    ? 'moratorium' :
+             score >= TIER_DEFAULTS.warning ? 'warning' :
+             score >= TIER_DEFAULTS.watch   ? 'watch' : 'none';
+
+  // Rule 1: 0% or unknown containment + any TIV → minimum Warning
+  if ((con === null || con === 0) && (a.tiv_exposed || 0) > 0 && tier === 'none') tier = 'watch';
+  if ((con === null || con === 0) && (a.tiv_exposed || 0) > 0 && tier === 'watch') tier = 'warning';
+
+  // Rule 2: Red flag + fire within 10mi + any policy → minimum Warning
+  if (redFlag && (a.policy_count || 0) >= 1 && tier === 'watch') tier = 'warning';
+
+  // Rule 3: 3+ alerts on same fire (rapid growth) → minimum Warning
+  if (alertCount >= 3 && tier === 'watch') tier = 'warning';
+
+  // Rule 4: Any fire >1000ac uncontained (<25%) + tribal TIV → Moratorium
+  if (ac >= 1000 && (con === null || con < 25) && (a.tiv_exposed || 0) > 0 && tier === 'warning') tier = 'moratorium';
+
+  return { score, tier, factors };
+}
+
+// Read live slider weights if Settings page has been initialized
+function getWeights() {
+  const w = {};
+  try {
+    WEIGHT_IDS.forEach(id => {
+      const el = document.getElementById('w-'+id);
+      w[id] = el ? parseInt(el.value) : WEIGHT_DEFAULTS[id];
+    });
+  } catch(e) { return WEIGHT_DEFAULTS; }
+  return w;
+}
+
+function moraFmtTIV(v) {
+  if (!v) return '$0';
+  if (v>=1000000) return '$'+(v/1000000).toFixed(2)+'M';
+  if (v>=1000) return '$'+(v/1000).toFixed(0)+'K';
+  return '$'+v.toFixed(0);
+}
+
+function moraTierLabel(t) {
+  return {none:'Monitor',watch:'Watch',warning:'Warning',moratorium:'Moratorium'}[t]||t;
+}
+
+function moraTierIcon(t) {
+  return {none:'✓',watch:'👁',warning:'⚠️',moratorium:'🚫'}[t]||'';
+}
+
+async function moraParseAndIngest() {
+  const text = document.getElementById('mora-email-paste').value.trim();
+  const status = document.getElementById('mora-parse-status');
+  if (!text) { status.textContent = 'Paste an RZAlert email first.'; status.style.color='var(--critical)'; return; }
+
+  const parsed = moraParseEmail(text);
+  const { score, tier } = moraTierScore(parsed);
+  parsed.mora_score = score; parsed.mora_tier = tier;
+
+  // Upsert locally — increment alert_count if fire already exists
+  const idx = moraCases.findIndex(c => c.fire_id === parsed.fire_id);
+  if (idx>=0) {
+    parsed.alert_count = (moraCases[idx].alert_count || 1) + 1;
+    const { score, tier, factors } = moraTierScore(parsed);
+    parsed.mora_score = score; parsed.mora_tier = tier; parsed.factors = factors;
+    moraCases[idx] = {...moraCases[idx], ...parsed};
+  } else {
+    const { score, tier, factors } = moraTierScore(parsed);
+    parsed.mora_score = score; parsed.mora_tier = tier; parsed.factors = factors;
+    moraCases.unshift(parsed);
+  }
+
+  const finalCase = moraCases.find(c => c.fire_id === parsed.fire_id);
+  const finalScore = finalCase?.mora_score || 0;
+  const finalTier  = finalCase?.mora_tier  || 'none';
+  status.textContent = `✓ Ingested: ${parsed.fire_name} — ${moraTierIcon(finalTier)} ${moraTierLabel(finalTier)} (score ${finalScore})${finalCase?.alert_count > 1 ? ' · Alert #'+finalCase.alert_count+' on this fire' : ''}`;
+  status.style.color = finalTier==='moratorium'?'var(--critical)':finalTier==='warning'?'var(--high)':finalTier==='watch'?'var(--moderate)':'var(--low)';
+  document.getElementById('mora-email-paste').value = '';
+
+  // Save to Supabase (non-blocking) — upsert on fire_id to handle re-ingests
+  if (SUPA_URL && SUPA_URL !== 'YOUR_SUPABASE_URL') {
+    try {
+      await sb('alerts', {
+        method:'POST',
+        prefer:'return=minimal,resolution=merge-duplicates',
+        body: {
+          fire_id: parsed.fire_id, fire_name: parsed.fire_name,
+          location_description: parsed.location_description,
+          lat: parsed.lat, lng: parsed.lng,
+          acres: parsed.acres, fire_type: parsed.fire_type,
+          containment_pct: parsed.containment_pct,
+          policy_count: parsed.policy_count, tiv_exposed: parsed.tiv_exposed,
+          tribal_affiliation: parsed.tribal_affiliation,
+          closest_property: parsed.closest_property,
+          weather_summary: parsed.weather_summary,
+          red_flag_active: parsed.red_flag_active,
+          mora_score: finalScore, mora_tier: finalTier,
+          factors: JSON.stringify(finalCase?.factors || {}),
+          alert_source: 'rzalert', received_at: parsed.received_at,
+          raw_payload: text
+        }
+      });
+    } catch(e) { console.warn('Supabase save failed (non-blocking):', e.message); }
+  }
+
+  renderMoraCases();
+}
+
+async function loadMoratoriumCases() {
+  if (!SUPA_URL || SUPA_URL === 'YOUR_SUPABASE_URL') {
+    renderMoraCases(); return;
+  }
+  try {
+    const data = await sb('alerts', { filter:'alert_source=eq.rzalert&order=received_at.desc&limit=100' });
+    if (Array.isArray(data)) {
+      data.forEach(row => {
+        if (!row.mora_score) {
+          const {score,tier,factors} = moraTierScore(row);
+          row.mora_score=score; row.mora_tier=tier; row.factors=factors;
+        }
+        const idx = moraCases.findIndex(c=>c.fire_id===row.fire_id);
+        if (idx>=0) moraCases[idx]={...moraCases[idx],...row};
+        else moraCases.push(row);
+      });
+    }
+    renderMoraCases();
+  } catch(e) { console.warn('Moratorium load failed:', e.message); renderMoraCases(); }
+}
+
+function moraSetFilter(f, btn) {
+  moraFilter = f;
+  document.querySelectorAll('#page-moratorium .filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderMoraCases();
+}
+
+function moraSetDecision(fireId, dec) {
+  const idx = moraCases.findIndex(c=>c.fire_id===fireId);
+  if (idx<0) return;
+  moraCases[idx].decision = dec;
+  const card = document.querySelector(`[data-mora-card="${CSS.escape(fireId)}"]`);
+  if (!card) return;
+  card.querySelectorAll('.mora-dec-btn').forEach(b=>b.classList.remove('sel-mora','sel-monitor','sel-clear'));
+  const target = card.querySelector(`[data-mora-dec="${dec}"]`);
+  if (target) target.classList.add(`sel-${dec}`);
+}
+
+function moraUpdateField(fireId, field, val) {
+  const idx = moraCases.findIndex(c=>c.fire_id===fireId);
+  if (idx>=0) moraCases[idx][field]=val;
+}
+
+async function moraSaveDecision(fireId) {
+  const idx = moraCases.findIndex(c=>c.fire_id===fireId);
+  if (idx<0) return;
+  const a = moraCases[idx];
+  const btn = document.querySelector(`[data-mora-save="${CSS.escape(fireId)}"]`);
+  if (btn) { btn.textContent='Saving...'; btn.disabled=true; }
+
+  if (SUPA_URL && SUPA_URL !== 'YOUR_SUPABASE_URL') {
+    try {
+      await sb('alerts', {
+        filter:`fire_id=eq.${encodeURIComponent(fireId)}`,
+        method:'PATCH', prefer:'return=minimal',
+        body:{ decision:a.decision, decision_by:a.decision_by, decision_note:a.decision_note, decision_at:new Date().toISOString() }
+      });
+    } catch(e) { console.warn('Decision save failed:', e.message); }
+  }
+
+  moraCases[idx].decision_at = new Date().toISOString();
+  if (btn) { btn.textContent='✓ Saved'; btn.style.color='var(--low)'; setTimeout(()=>{btn.textContent='Save';btn.style.color='';btn.disabled=false;},3000); }
+}
+
+function renderMoraCases() {
+  const list = document.getElementById('mora-case-list');
+  let visible = moraCases;
+  if (moraFilter==='undecided') visible = moraCases.filter(c=>['warning','moratorium'].includes(c.mora_tier||'none')&&!c.decision);
+  else if (moraFilter!=='all') visible = moraCases.filter(c=>(c.mora_tier||'none')===moraFilter);
+
+  // Update stats
+  document.getElementById('mora-stat-mora').textContent     = moraCases.filter(c=>c.mora_tier==='moratorium').length;
+  document.getElementById('mora-stat-warning').textContent  = moraCases.filter(c=>c.mora_tier==='warning').length;
+  document.getElementById('mora-stat-watch').textContent    = moraCases.filter(c=>c.mora_tier==='watch').length;
+  document.getElementById('mora-stat-undecided').textContent= moraCases.filter(c=>['warning','moratorium'].includes(c.mora_tier||'none')&&!c.decision).length;
+
+  if (!visible.length) {
+    list.innerHTML='<div class="empty-state"><div class="empty-icon">🔥</div>No cases matching this filter.</div>';
+    return;
+  }
+
+  list.innerHTML = visible.map(a => {
+    const tier  = a.mora_tier || 'none';
+    const score = a.mora_score || 0;
+    const pct   = Math.min(100,score);
+    const selMora    = a.decision==='mora'    ? 'sel-mora'    : '';
+    const selMonitor = a.decision==='monitor' ? 'sel-monitor' : '';
+    const selClear   = a.decision==='clear'   ? 'sel-clear'   : '';
+    const safeId     = a.fire_id.replace(/"/g,'&quot;');
+
+    return `<div class="mora-card mora-tier-${tier}" data-mora-card="${safeId}">
+      <div class="mora-card-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+            <span class="mora-badge mora-badge-${tier}">${moraTierIcon(tier)} ${moraTierLabel(tier)}</span>
+            ${a.decision ? `<span class="severity-badge" style="background:#f0fff0;color:var(--low)">✓ ${a.decision==='mora'?'Moratorium placed':a.decision==='monitor'?'Monitoring':'Cleared'}</span>` : ''}
+          </div>
+          <div style="font-size:14px;font-weight:500">${a.fire_name||'Unknown'}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--mono)">${a.fire_id} ${a.location_description?'· '+a.location_description:''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:500;line-height:1;color:${tier==='moratorium'?'var(--critical)':tier==='warning'?'var(--high)':tier==='watch'?'var(--moderate)':'var(--low)'}">${score}</div>
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">/100 risk score</div>
+          <div class="mora-score-track" style="width:80px;margin-top:4px;margin-left:auto">
+            <div class="mora-score-fill-${tier}" style="width:${pct}%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mora-card-grid">
+        <div>
+          <div class="mora-meta-label">Tribe</div>
+          <div class="mora-meta-val">${a.tribal_affiliation||'—'}</div>
+        </div>
+        <div>
+          <div class="mora-meta-label">TIV Exposed</div>
+          <div class="mora-meta-val" style="color:var(--accent)">${moraFmtTIV(a.tiv_exposed)}</div>
+        </div>
+        <div>
+          <div class="mora-meta-label">Policies</div>
+          <div class="mora-meta-val">${a.policy_count||0} within 2.5mi</div>
+        </div>
+        <div>
+          <div class="mora-meta-label">Fire Size</div>
+          <div class="mora-meta-val">${a.acres||'?'} acres</div>
+        </div>
+        <div>
+          <div class="mora-meta-label">Containment</div>
+          <div class="mora-meta-val">${a.containment_pct!==null&&a.containment_pct!==undefined?a.containment_pct+'%':'Unknown'}</div>
+        </div>
+        <div>
+          <div class="mora-meta-label">Received</div>
+          <div class="mora-meta-val" style="font-family:var(--mono);font-size:11px">${a.received_at?timeAgo(a.received_at):'—'}</div>
+        </div>
+        ${a.closest_property?`<div class="full"><div class="mora-meta-label">Closest Exposure</div><div class="mora-meta-val" style="font-size:11px">${a.closest_property}</div></div>`:''}
+        ${a.weather_summary?`<div class="full"><div class="mora-meta-label">Weather</div><div class="mora-meta-val" style="font-size:11px;color:var(--muted)">${a.weather_summary}${a.red_flag_active?' <span style="color:var(--critical);font-weight:600">🚩 RED FLAG</span>':''}</div></div>`:''}
+      </div>
+
+      <!-- Score factor breakdown -->
+      ${a.factors ? `<div style="margin-bottom:10px;padding:10px 12px;background:var(--bg);border-radius:var(--radius);display:flex;flex-wrap:wrap;gap:6px 14px">
+        ${Object.entries(a.factors).map(([k,v])=>{
+          const labels={fire:'Fire Size',containment:'Containment',growth:'Growth Rate',tiv:'TIV',policy:'Policies',wx:'Weather',drought:'Drought',topo:'Terrain'};
+          const col = v>=75?'var(--critical)':v>=50?'var(--high)':v>=25?'var(--moderate)':'var(--low)';
+          return `<div style="font-size:10px;font-family:var(--mono)"><span style="color:var(--muted)">${labels[k]||k}:</span> <span style="color:${col};font-weight:500">${v}</span></div>`;
+        }).join('')}
+        ${a.alert_count>1?`<div style="font-size:10px;font-family:var(--mono);color:var(--critical);font-weight:600">⚡ ${a.alert_count} alerts — fire is growing</div>`:''}
+      </div>` : ''}
+
+      <div class="mora-decision-section">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:6px">Underwriting Decision</div>
+        <div class="mora-dec-btns">
+          <button class="mora-dec-btn ${selMora}"    data-mora-dec="mora"    onclick="moraSetDecision('${safeId}','mora')">🚫 Place Moratorium</button>
+          <button class="mora-dec-btn ${selMonitor}" data-mora-dec="monitor" onclick="moraSetDecision('${safeId}','monitor')">👁 Monitor</button>
+          <button class="mora-dec-btn ${selClear}"   data-mora-dec="clear"   onclick="moraSetDecision('${safeId}','clear')">✓ Clear / No Action</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <input type="text" class="form-input" style="width:160px;flex-shrink:0" placeholder="Assigned UW..." value="${a.decision_by||''}"
+            onchange="moraUpdateField('${safeId}','decision_by',this.value)">
+          <input type="text" class="form-input" style="flex:1" placeholder="Notes (optional)..." value="${a.decision_note||''}"
+            onchange="moraUpdateField('${safeId}','decision_note',this.value)">
+          <button class="btn btn-outline btn-sm" data-mora-save="${safeId}" onclick="moraSaveDecision('${safeId}')">Save</button>
+        </div>
+        ${a.decision_at?`<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:6px">Last saved ${timeAgo(a.decision_at)}${a.decision_by?' by '+a.decision_by:''}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadAlerts();
 </script>
 </body>
 </html>
