@@ -451,10 +451,12 @@ function showPage(name) {
 // ── Stats ─────────────────────────────────────────────────────────────────────
 async function loadStats() {
   try {
-    const [props, runs] = await Promise.all([
+    const [propsRaw, runsRaw] = await Promise.all([
       sb('portfolio', { select: 'state,tiv,last_risk_score' }),
       sb('monitor_runs', { filter: 'order=started_at.desc&limit=5' }),
     ]);
+    const props = Array.isArray(propsRaw) ? propsRaw : [];
+    const runs = Array.isArray(runsRaw) ? runsRaw : [];
     const total = props.length;
     const totalTIV = props.reduce((s,p)=>s+(p.tiv||0),0);
     const highRisk = props.filter(p=>(p.last_risk_score||0)>=65).length;
@@ -485,11 +487,12 @@ function timeAgo(dateStr) {
 // ── Alert inbox ───────────────────────────────────────────────────────────────
 async function loadAlerts() {
   try {
-    if (!SUPA_URL || !SUPA_KEY) {
+    if (!SUPA_URL || SUPA_URL.includes('YOUR_SUPABASE')) {
       document.getElementById('alert-list').innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div>Add your Supabase URL and anon key to the top of this file to connect.</div>';
       return;
     }
-    allAlerts = await sb('alerts', { filter: 'order=created_at.desc&limit=200' });
+    const result = await sb('alerts', { filter: 'order=created_at.desc&limit=200' });
+    allAlerts = Array.isArray(result) ? result : [];
     renderAlerts();
     loadStats();
   } catch(e) {
