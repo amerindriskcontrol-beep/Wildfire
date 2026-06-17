@@ -1337,7 +1337,9 @@ async function reverseGeoState(lat, lng) {
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: {'User-Agent':'AMERIND-WildfireRisk/1.0'} });
     const d = await r.json();
     return {
-      state: d.address?.state_code?.toUpperCase() || d.address?.state?.substring(0,2).toUpperCase() || '',
+      const stateMap = {'Arizona':'AZ','California':'CA','Washington':'WA','Oregon':'OR','Montana':'MT','Nevada':'NV','Utah':'UT','Colorado':'CO','New Mexico':'NM','Idaho':'ID','Wyoming':'WY','Texas':'TX','Oklahoma':'OK','Minnesota':'MN','South Dakota':'SD','North Dakota':'ND','Florida':'FL'};
+const stateName = d.address?.state || '';
+return stateMap[stateName] || d.address?.['ISO3166-2-lvl4']?.replace('US-','') || stateName.substring(0,2).toUpperCase() || '';
       county: d.address?.county?.replace(' County','') || '',
       city: d.address?.city || d.address?.town || d.address?.village || '',
     };
