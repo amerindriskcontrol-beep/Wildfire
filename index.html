@@ -325,7 +325,11 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const API_KEY = "AIzaSyDomOvPPEUknUqFW-QFo3Eh6OD-g3lorVs";
-let map, marker, droughtLayer, fireLayer, redFlagLayer, firmsLayer, windLayer, currentResult = null;
+let map, marker, droughtLayer, fireLayer, redFlagLayer, firmsLayer, windLayer, portfolioLayer, threatLayer, currentResult = null;
+
+// ── Supabase config for portfolio overlay ─────────────────────────────────────
+const SUPA_URL = 'https://cwnshkewhrummwpnfwlh.supabase.co';
+const SUPA_KEY = 'sb_publishable__A6TaNRi-IUANSefmaNAnA_sEGGhqAQ';
 
 document.getElementById('hdr-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
 
@@ -403,6 +407,8 @@ function updateLayerControl() {
   if (fireLayer)    overlays['🟠 Fire perimeters (NIFC)'] = fireLayer;
   if (droughtLayer) overlays['💧 Drought monitor (NDMC)'] = droughtLayer;
   if (windLayer)    overlays['💨 Wind direction'] = windLayer;
+  if (portfolioLayer) overlays['📍 Insured properties'] = portfolioLayer;
+  if (threatLayer)   overlays['⭕ Threat buffer rings'] = threatLayer;
   map._layerControl = L.control.layers(
     { 'Google Maps': map._baseMapLayer },
     overlays,
@@ -509,6 +515,67 @@ async function addFireLayer(lat, lng) {
   return 0;
 }
 
+
+// ── Portfolio property overlay — shows insured properties near assessed location ──
+async function addPortfolioOverlay(lat, lng, radiusMiles = 50) {
+  if (portfolioLayer) { try { map.removeLayer(portfolioLayer); } catch(e) {} }
+  try {
+    const degRadius = radiusMiles / 69;
+    const res = await fetch(
+      `${SUPA_URL}/rest/v1/portfolio?select=address,city,state,lat,lng,tiv,tribe,last_risk_score,policy_number` +
+      `&lat=gte.${lat - degRadius}&lat=lte.${lat + degRadius}` +
+      `&lng=gte.${lng - degRadius}&lng=lte.${lng + degRadius}&limit=500`,
+      { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
+    );
+    if (!res.ok) return;
+    const props = await res.json();
+    if (!Array.isArray(props) || !props.length) return;
+    const inRadius = props.filter(p => {
+      if (!p.lat || !p.lng) return false;
+      const dlat = (p.lat - lat) * Math.PI / 180;
+      const dlng = (p.lng - lng) * Math.PI / 180;
+      const a = Math.sin(dlat/2)**2 + Math.cos(lat*Math.PI/180)*Math.cos(p.lat*Math.PI/180)*Math.sin(dlng/2)**2;
+      return 3959 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= radiusMiles;
+    });
+    if (!inRadius.length) return;
+    portfolioLayer = L.layerGroup();
+    inRadius.forEach(p => {
+      const score = p.last_risk_score || 0;
+      const color = score >= 75 ? '#8b0000' : score >= 55 ? '#c4420a' : score >= 35 ? '#b07a00' : '#2d6a2d';
+      const size = score >= 55 ? 10 : 7;
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+        iconSize: [size, size], iconAnchor: [size/2, size/2],
+      });
+      const tiv = p.tiv ? '$' + Math.round(p.tiv/1000).toLocaleString() + 'K' : '—';
+      const addr = [p.address, p.city, p.state].filter(Boolean).join(', ');
+      L.marker([p.lat, p.lng], { icon, zIndexOffset: 500 })
+        .bindPopup(`<div style="font-size:12px;min-width:180px"><div style="font-weight:600;margin-bottom:4px">${addr || 'Unknown address'}</div><div style="color:#666;margin-bottom:6px">${p.tribe || '—'}</div><div style="display:flex;gap:12px"><div><div style="font-size:10px;color:#888">TIV</div><div style="font-weight:500">${tiv}</div></div><div><div style="font-size:10px;color:#888">Risk</div><div style="font-weight:500;color:${color}">${score||'—'}</div></div>${p.policy_number ? `<div><div style="font-size:10px;color:#888">Policy</div><div style="font-weight:500">${p.policy_number}</div></div>` : ''}</div></div>`)
+        .addTo(portfolioLayer);
+    });
+    portfolioLayer.addTo(map);
+    updateLayerControl();
+    const highRisk = inRadius.filter(p => (p.last_risk_score||0) >= 55).length;
+    const totalTIV = inRadius.reduce((s,p) => s+(p.tiv||0), 0);
+    setStatus(`Assessment complete — ${inRadius.length} insured properties within ${radiusMiles}mi${highRisk ? `, ${highRisk} high-risk` : ''}${totalTIV ? `, $${Math.round(totalTIV/1000000*10)/10}M TIV` : ''}`);
+  } catch(e) { console.warn('Portfolio overlay failed:', e.message); }
+}
+
+// ── Threat buffer rings ───────────────────────────────────────────────────────
+function addThreatBuffers(lat, lng) {
+  if (threatLayer) { try { map.removeLayer(threatLayer); } catch(e) {} }
+  threatLayer = L.layerGroup();
+  L.circle([lat, lng], { radius: 10*1609.34, color:'#8b0000', fillColor:'#8b0000', fillOpacity:0.04, weight:1.5, dashArray:'6 4' })
+    .bindPopup('<b>10-mile critical zone</b><br>Immediate threat radius.').addTo(threatLayer);
+  L.circle([lat, lng], { radius: 25*1609.34, color:'#c4420a', fillColor:'#c4420a', fillOpacity:0.02, weight:1, dashArray:'4 6' })
+    .bindPopup('<b>25-mile monitoring zone</b><br>Elevated exposure radius.').addTo(threatLayer);
+  L.circle([lat, lng], { radius: 50*1609.34, color:'#b07a00', fillColor:'transparent', fillOpacity:0, weight:0.75, dashArray:'2 8' })
+    .bindPopup('<b>50-mile portfolio scan radius</b>').addTo(threatLayer);
+  threatLayer.addTo(map);
+  updateLayerControl();
+}
+
 // ── NASA FIRMS — GIBS WMTS, maxNativeZoom:9 so tiles stretch at higher zoom ──
 function addFIRMSLayerMercator() {
   if (firmsLayer) { try { map.removeLayer(firmsLayer); } catch(e) {} }
@@ -528,19 +595,20 @@ function addFIRMSLayerMercator() {
   map._firmsNPP = firmsLayer2;
 }
 
+// ── Animated wind particles ───────────────────────────────────────────────────
+let windAnimFrame = null;
+let windCanvas = null;
+
 function addWindLayer(lat, lng, windDir, windSpeed) {
   if (windLayer) { try { map.removeLayer(windLayer); } catch(e) {} }
+  if (windCanvas) { windCanvas.remove(); windCanvas = null; }
+  if (windAnimFrame) { cancelAnimationFrame(windAnimFrame); windAnimFrame = null; }
   if (!windDir || !windSpeed) return;
+
   const cardinal = getWindCardinal(windDir);
-  const arrowIcon = L.divIcon({
-    className: '',
-    html: `<div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.95);border:2px solid #1a1814;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:20px;transform:rotate(${windDir}deg)">↑</div>`,
-    iconSize: [44,44], iconAnchor: [22,22],
-  });
   windLayer = L.layerGroup();
-  L.marker([lat,lng], { icon: arrowIcon, zIndexOffset: 1000 })
-    .bindPopup(`<b>Wind: ${windSpeed} mph from ${cardinal}</b><br><small>Arrow shows wind direction</small>`)
-    .addTo(windLayer);
+
+  // Keep the spread cone for fire direction
   if (windSpeed >= 8) {
     const spreadDir = (windDir + 180) % 360;
     const coneAngle = windSpeed > 25 ? 25 : windSpeed > 15 ? 35 : 45;
@@ -553,15 +621,143 @@ function addWindLayer(lat, lng, windDir, windSpeed) {
     }
     points.push([lat,lng]);
     const coneColor = windSpeed > 25 ? '#8b0000' : windSpeed > 15 ? '#c4420a' : '#e07b00';
-    L.polygon(points, { color:coneColor, fillColor:coneColor, fillOpacity:0.12, weight:1.5, dashArray:'4 4' })
+    L.polygon(points, { color:coneColor, fillColor:coneColor, fillOpacity:0.10, weight:1.5, dashArray:'4 4' })
       .bindPopup(`<b>Probable fire spread direction</b><br>Wind: ${windSpeed} mph from ${cardinal}`)
       .addTo(windLayer);
     const ringDeg = (windSpeed * 0.3) / 69;
     L.circle([lat,lng], { radius: ringDeg*111000, color:coneColor, fillOpacity:0, weight:1, dashArray:'3 6' })
       .addTo(windLayer);
   }
+
   windLayer.addTo(map);
   updateLayerControl();
+
+  // ── Animated wind particle canvas ──
+  // Create canvas overlay on top of the map
+  const mapEl = document.getElementById('map');
+  windCanvas = document.createElement('canvas');
+  windCanvas.id = 'wind-canvas';
+  windCanvas.style.cssText = `
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    pointer-events:none;z-index:400;border-radius:var(--radius-lg);
+  `;
+  mapEl.style.position = 'relative';
+  mapEl.appendChild(windCanvas);
+
+  const ctx = windCanvas.getContext('2d');
+  const W = () => windCanvas.width = mapEl.offsetWidth;
+  const H = () => windCanvas.height = mapEl.offsetHeight;
+  W(); H();
+
+  // Wind direction: meteorological (where wind comes FROM) → convert to movement angle
+  // windDir=0 means FROM north → particles move SOUTH (down) = angle 180°
+  const moveAngleRad = ((windDir + 180) % 360) * Math.PI / 180;
+  const dx = Math.sin(moveAngleRad); // x component of movement
+  const dy = -Math.cos(moveAngleRad); // y component (negative because canvas y is flipped)
+
+  // Speed: faster wind = faster particles
+  const baseSpeed = Math.max(0.4, Math.min(2.5, windSpeed / 12));
+
+  // Color based on wind speed danger
+  const particleColor = windSpeed > 30 ? '139,0,0' : windSpeed > 20 ? '196,66,10' : windSpeed > 12 ? '176,122,0' : '80,120,180';
+
+  // Particle count scales with wind speed
+  const COUNT = Math.round(40 + windSpeed * 1.5);
+
+  // Initialize particles spread across the canvas
+  const particles = Array.from({ length: COUNT }, () => ({
+    x: Math.random() * mapEl.offsetWidth,
+    y: Math.random() * mapEl.offsetHeight,
+    speed: baseSpeed * (0.6 + Math.random() * 0.8),
+    length: 8 + Math.random() * 16,
+    opacity: 0.2 + Math.random() * 0.5,
+    phase: Math.random() * Math.PI * 2, // for fade cycling
+    age: Math.random() * 100, // stagger initial ages
+  }));
+
+  function animate() {
+    ctx.clearRect(0, 0, windCanvas.width, windCanvas.height);
+    const t = Date.now() / 1000;
+
+    particles.forEach(p => {
+      p.age++;
+      p.x += dx * p.speed;
+      p.y += dy * p.speed;
+
+      // Wrap around edges
+      if (p.x < -20) p.x = windCanvas.width + 10;
+      if (p.x > windCanvas.width + 20) p.x = -10;
+      if (p.y < -20) p.y = windCanvas.height + 10;
+      if (p.y > windCanvas.height + 20) p.y = -10;
+
+      // Fade in/out based on age cycle
+      const cycle = (Math.sin(p.age * 0.03 + p.phase) + 1) / 2;
+      const alpha = p.opacity * cycle;
+
+      // Draw animated arrow streak
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = `rgba(${particleColor},1)`;
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+
+      // Tail (behind particle)
+      const tailX = p.x - dx * p.length;
+      const tailY = p.y - dy * p.length;
+
+      // Gradient along the streak
+      const grad = ctx.createLinearGradient(tailX, tailY, p.x, p.y);
+      grad.addColorStop(0, `rgba(${particleColor},0)`);
+      grad.addColorStop(1, `rgba(${particleColor},${alpha})`);
+      ctx.strokeStyle = grad;
+
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+
+      // Arrowhead at front
+      const arrowSize = 4;
+      const perpX = -dy * arrowSize * 0.5;
+      const perpY = dx * arrowSize * 0.5;
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.fillStyle = `rgba(${particleColor},${alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - dx*arrowSize + perpX, p.y - dy*arrowSize + perpY);
+      ctx.lineTo(p.x - dx*arrowSize - perpX, p.y - dy*arrowSize - perpY);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    });
+
+    windAnimFrame = requestAnimationFrame(animate);
+  }
+
+  // Resize canvas when map resizes
+  const resizeObs = new ResizeObserver(() => {
+    windCanvas.width = mapEl.offsetWidth;
+    windCanvas.height = mapEl.offsetHeight;
+  });
+  resizeObs.observe(mapEl);
+  windCanvas._resizeObs = resizeObs;
+
+  animate();
+
+  // Stop animation when wind layer is removed from map
+  map.on('overlayremove', (e) => {
+    if (e.name === '💨 Wind direction') {
+      if (windAnimFrame) { cancelAnimationFrame(windAnimFrame); windAnimFrame = null; }
+      if (windCanvas) { windCanvas.style.display = 'none'; }
+    }
+  });
+  map.on('overlayadd', (e) => {
+    if (e.name === '💨 Wind direction') {
+      if (windCanvas) { windCanvas.style.display = 'block'; }
+      animate();
+    }
+  });
 }
 
 function getWindCardinal(deg) {
@@ -1008,6 +1204,10 @@ function clearResults() {
   if (droughtLayer) { map.removeLayer(droughtLayer); droughtLayer = null; }
   if (fireLayer) { map.removeLayer(fireLayer); fireLayer = null; }
   if (windLayer) { try { map.removeLayer(windLayer); } catch(e) {} windLayer = null; }
+  if (windAnimFrame) { cancelAnimationFrame(windAnimFrame); windAnimFrame = null; }
+  if (windCanvas) { if (windCanvas._resizeObs) windCanvas._resizeObs.disconnect(); windCanvas.remove(); windCanvas = null; }
+  if (portfolioLayer) { try { map.removeLayer(portfolioLayer); } catch(e) {} portfolioLayer = null; }
+  if (threatLayer) { try { map.removeLayer(threatLayer); } catch(e) {} threatLayer = null; }
   setStatus('Enter a property address to generate a wildfire risk assessment.');
   currentResult = null;
   document.getElementById('pdf-btn').disabled = true;
@@ -1040,9 +1240,10 @@ async function runFromCoords(lat, lng) {
     fetchAndRenderSocialFeeds(lat, lng, state, county, city);
     const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
     const score = compositeScore(factors);
-    setStatus(`Assessment complete — pin at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
     renderResults(score, factors, `📍 ${fmtAddr}`, wx);
     updateLayerControl();
+    addThreatBuffers(lat, lng);
+    addPortfolioOverlay(lat, lng);
   } catch(e) { setStatus('Error: ' + e.message); console.error(e); }
   document.getElementById('assess-btn').disabled = false;
 }
@@ -1082,9 +1283,10 @@ async function runSearch() {
     fetchAndRenderSocialFeeds(lat, lng, state, county, city);
     const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
     const score = compositeScore(factors);
-    setStatus(`Assessment complete — ${fmtAddr}`);
     renderResults(score, factors, fmtAddr, wx);
     updateLayerControl();
+    addThreatBuffers(lat, lng);
+    addPortfolioOverlay(lat, lng);
   } catch(e) { setStatus('Error: ' + e.message); console.error(e); }
   document.getElementById('assess-btn').disabled = false;
 }
