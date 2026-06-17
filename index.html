@@ -370,9 +370,9 @@ function togglePinMode() {
   if (!pinModeActive) document.getElementById('pin-coords').textContent = '';
 }
 
-function initMap(lat, lng) {
+function initMap(lat, lng, zoom = 11) {
   if (!map) {
-    map = L.map('map').setView([lat, lng], 11);
+    map = L.map('map').setView([lat, lng], zoom);
 
     // Google Maps road tiles
     const basemap = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -1365,8 +1365,67 @@ function exportPDF() {
   doc.save(`AMERIND_Wildfire_Risk_${addr.replace(/[^a-z0-9]/gi,'_').substring(0,40)}.pdf`);
 }
 
+// ── National fire perimeter layer — loads on map open, no search required ────
+let nationalFireLayer = null;
+
+async function loadNationalFirePerimeters() {
+  if (nationalFireLayer) { try { map.removeLayer(nationalFireLayer); } catch(e) {} }
+  try {
+    // Query WFIGS for all active YTD perimeters — western US focus (AMERIND portfolio)
+    const url = `https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters_YTD/FeatureServer/0/query?where=1%3D1&outFields=IncidentName,GISAcres,PercentContained,POOState&geometry=-130%2C25%2C-65%2C55&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=geojson&resultRecordCount=200&orderByFields=GISAcres+DESC`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!data.features?.length) return;
+
+    nationalFireLayer = L.geoJSON(data, {
+      style: f => {
+        const acres = f.properties.GISAcres || 0;
+        // Larger fires = more opaque / brighter
+        const opacity = acres > 10000 ? 0.55 : acres > 1000 ? 0.40 : 0.25;
+        const fillOpacity = acres > 10000 ? 0.20 : acres > 1000 ? 0.12 : 0.06;
+        return { color: '#cc2200', fillColor: '#ff5500', weight: 1.5, opacity, fillOpacity };
+      },
+      onEachFeature: (f, l) => {
+        const name = f.properties.IncidentName || 'Unknown Fire';
+        const acres = f.properties.GISAcres ? Math.round(f.properties.GISAcres).toLocaleString() : '?';
+        const pct = f.properties.PercentContained != null ? `${Math.round(f.properties.PercentContained)}% contained` : 'Containment unknown';
+        const state = f.properties.POOState || '';
+        l.bindPopup(`<div style="font-size:13px"><b>🔥 ${name}</b><br><span style="color:#666">${state}</span><br>${acres} acres &nbsp;·&nbsp; ${pct}</div>`);
+        l.on('mouseover', () => l.setStyle({ fillOpacity: 0.35, weight: 2.5 }));
+        l.on('mouseout', () => nationalFireLayer.resetStyle(l));
+      }
+    }).addTo(map);
+
+    // Add to layer control
+    if (map._layerControl) map.removeControl(map._layerControl);
+    const overlays = {};
+    overlays['🔥 NASA FIRMS hotspots'] = firmsLayer;
+    overlays['🟠 Active fire perimeters'] = nationalFireLayer;
+    if (fireLayer)      overlays['🟠 Fire perimeters (local)'] = fireLayer;
+    if (droughtLayer)   overlays['💧 Drought monitor (NDMC)'] = droughtLayer;
+    if (windLayer)      overlays['💨 Wind direction'] = windLayer;
+    if (portfolioLayer) overlays['📍 Insured properties'] = portfolioLayer;
+    if (threatLayer)    overlays['⭕ Threat buffer rings'] = threatLayer;
+    map._layerControl = L.control.layers(
+      { 'Google Maps': map._baseMapLayer },
+      overlays,
+      { collapsed: true, position: 'bottomleft' }
+    ).addTo(map);
+
+    console.log(`National fire perimeters: ${data.features.length} fires loaded`);
+    setStatus(`${data.features.length} active fire perimeters loaded — enter an address to assess a specific property.`);
+
+  } catch(e) { console.warn('National fire perimeters failed:', e.message); }
+}
+
 window.addEventListener('load', () => {
-  initMap(38.5, -96);
+  // Center on AMERIND portfolio footprint — western/central US
+  initMap(44, -108, 4);
+
+  // Load national fire perimeters immediately
+  setTimeout(() => loadNationalFirePerimeters(), 800);
+
   // Auto-run from monitor alert hash: index.html#lat,lng,label
   const hash = window.location.hash.replace('#','');
   if (hash) {
