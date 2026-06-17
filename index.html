@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Google Maps + Places Autocomplete -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDomOvPPEUknUqFW-QFo3Eh6OD-g3lorVs&libraries=places&callback=initAutocomplete" async defer></script>
 <style>
 :root {
   --bg: #f7f5f0; --surface: #ffffff; --border: #e2ddd6;
@@ -76,8 +78,6 @@ header { background: var(--text); color: #fff; padding: 14px 32px; display: flex
 .legend-section-title { font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin: 10px 0 6px; }
 .legend-section-title:first-child { margin-top: 0; }
 .legend-divider { height: 0.5px; background: var(--border); margin: 10px 0; }
-
-/* Weather strip */
 .weather-strip { display: none; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .weather-strip.visible { display: grid; }
 .wx-cell { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; text-align: center; }
@@ -85,15 +85,11 @@ header { background: var(--text); color: #fff; padding: 14px 32px; display: flex
 .wx-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
 .wx-warn { border-color: #cc2200; background: #fff8f6; }
 .wx-warn .wx-val { color: #cc2200; }
-
-/* Red flag banner */
 .redflag-banner { display: none; background: #fff0ed; border: 1px solid #e07060; border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px; }
 .redflag-banner.visible { display: flex; align-items: flex-start; gap: 10px; }
 .redflag-icon { font-size: 18px; flex-shrink: 0; }
 .redflag-title { font-size: 13px; font-weight: 600; color: #8b0000; }
 .redflag-desc { font-size: 11px; color: #8b3030; margin-top: 2px; line-height: 1.4; }
-
-/* Social feed — tabbed */
 .social-panel { display: none; }
 .social-panel.visible { display: block; }
 .feed-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
@@ -123,14 +119,9 @@ header { background: var(--text); color: #fff; padding: 14px 32px; display: flex
 .feed-loading { font-size: 12px; color: var(--muted); padding: 16px 0; font-style: italic; }
 .feed-empty { font-size: 12px; color: var(--muted); padding: 12px 0; }
 .social-disclaimer { font-size: 10px; color: var(--muted); margin-top: 10px; padding-top: 8px; border-top: 0.5px solid var(--border); line-height: 1.5; }
-
-/* Pin mode */
 #map.pin-mode { cursor: crosshair !important; }
 #map.pin-mode .leaflet-container { cursor: crosshair !important; }
-.pin-mode-active #pin-btn { background: #fffbf0; border-color: #e0c060; color: #7a5c00; }
-
 .iso-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-/* NIFC 7-day forecast */
 .forecast-card { display: none; }
 .forecast-card.visible { display: block; }
 .forecast-day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
@@ -142,13 +133,7 @@ header { background: var(--text); color: #fff; padding: 14px 32px; display: flex
 .fp-above { background: #fff5f0; color: #c4420a; }
 .fp-critical { background: #fff0f0; color: #8b0000; }
 .fp-none { background: var(--bg); color: var(--muted); }
-
-/* Below-map full-width sections */
-.below-grid { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-@media (max-width: 860px) { .below-grid { grid-template-columns: 1fr; } }
 .below-grid-full { margin-top: 20px; }
-
-/* Sources footer */
 footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px; }
 .footer-sources { max-width: 1200px; margin: 0 auto; padding: 28px 24px 20px; }
 .footer-sources-title { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
@@ -161,6 +146,11 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
 .source-url a:hover { text-decoration: underline; }
 .source-desc { font-size: 10px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
 .footer-bottom { border-top: 1px solid var(--border); padding: 12px 24px; text-align: center; font-size: 10px; color: var(--muted); max-width: 1200px; margin: 0 auto; }
+/* Google Places autocomplete dropdown styling */
+.pac-container { font-family: var(--sans); font-size: 14px; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.pac-item { padding: 8px 12px; cursor: pointer; }
+.pac-item:hover { background: var(--accent-light); }
+.pac-item-selected { background: var(--accent-light); }
 </style>
 </head>
 <body>
@@ -179,17 +169,16 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
 
 <div class="container">
 
-  <!-- Search -->
   <div class="search-section">
     <div class="search-label">Property address</div>
     <div class="search-row">
-      <input type="text" id="addr" placeholder="123 Main St, Flagstaff, AZ 86001" />
+      <input type="text" id="addr" placeholder="123 Main St, Flagstaff, AZ 86001" autocomplete="off" />
       <button class="btn btn-primary" id="assess-btn" onclick="runSearch()">Assess risk</button>
       <button class="btn btn-outline" id="pin-btn" onclick="togglePinMode()" title="Drop a pin on the map for addresses that can't be geocoded">Drop pin</button>
     </div>
-    <div id="pin-mode-bar" style="display:none;margin-top:10px;padding:10px 14px;background:#fffbf0;border:1px solid #e0c060;border-radius:var(--radius);font-size:12px;color:#7a5c00;display:none;align-items:center;gap:10px;flex-wrap:wrap">
+    <div id="pin-mode-bar" style="display:none;margin-top:10px;padding:10px 14px;background:#fffbf0;border:1px solid #e0c060;border-radius:var(--radius);font-size:12px;color:#7a5c00;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-weight:600">Pin mode active</span>
-      <span>Click anywhere on the map to place your pin. Useful for tribal addresses not found by geocoding.</span>
+      <span>Click anywhere on the map to place your pin.</span>
       <span id="pin-coords" style="font-family:var(--mono);font-size:11px;color:#5a4400"></span>
       <button class="btn btn-outline" style="padding:4px 10px;font-size:12px" onclick="togglePinMode()">Cancel</button>
     </div>
@@ -199,19 +188,16 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
     </div>
   </div>
 
-  <!-- Weather strip (full width above map) -->
   <div class="weather-strip" id="weather-strip">
     <div class="wx-cell" id="wx-temp"><div class="wx-val" id="wx-temp-val">—</div><div class="wx-label">Temperature</div></div>
     <div class="wx-cell" id="wx-humidity"><div class="wx-val" id="wx-humidity-val">—</div><div class="wx-label">Humidity</div></div>
     <div class="wx-cell" id="wx-wind"><div class="wx-val" id="wx-wind-val">—</div><div class="wx-label">Wind speed</div></div>
     <div class="wx-cell" id="wx-gust"><div class="wx-val" id="wx-gust-val">—</div><div class="wx-label">Wind gust</div></div>
   </div>
-  <div style="height:12px" id="wx-spacer" style="display:none"></div>
+  <div style="height:12px" id="wx-spacer"></div>
 
-  <!-- Main grid: map + panel -->
   <div class="main-grid">
     <div>
-      <!-- Red flag warning -->
       <div class="redflag-banner" id="redflag-banner">
         <div class="redflag-icon">&#9873;</div>
         <div>
@@ -223,8 +209,6 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
     </div>
 
     <div class="panel">
-
-      <!-- Risk score -->
       <div class="card risk-banner" id="risk-banner">
         <div class="risk-level-row">
           <div class="risk-score" id="risk-score-num">—</div>
@@ -239,13 +223,11 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
         <div class="meta-row" id="meta-row"></div>
       </div>
 
-      <!-- ISO fire protection class -->
       <div class="card" id="iso-card" style="display:none">
         <div class="card-title">ISO fire protection class</div>
         <div id="iso-content"></div>
       </div>
 
-      <!-- NIFC 7-day fire potential forecast -->
       <div class="card forecast-card" id="forecast-card">
         <div class="card-title">NIFC 7-day significant fire potential</div>
         <div id="forecast-content"></div>
@@ -253,16 +235,13 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
         <div style="font-size:10px;color:var(--muted);margin-top:8px">Source: NIFC National Predictive Services — updated daily</div>
       </div>
 
-      <!-- Factor breakdown -->
       <div class="card factors-card" id="factors-card">
         <div class="card-title">Factor breakdown</div>
         <div id="factor-list"></div>
       </div>
 
-      <!-- Legend -->
       <div class="card">
         <div class="card-title">Map legend</div>
-
         <div class="legend-section-title">Drought monitor (NDMC)</div>
         <div class="legend-grid">
           <div class="legend-item"><div class="legend-dot" style="background:#fffacd;border-color:#ccc"></div>D0 Abnormally dry</div>
@@ -271,14 +250,12 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
           <div class="legend-item"><div class="legend-dot" style="background:#cc2200;border-color:#991a00"></div>D3 Extreme</div>
           <div class="legend-item"><div class="legend-dot" style="background:#7a0000;border-color:#550000"></div>D4 Exceptional</div>
         </div>
-
         <div class="legend-divider"></div>
         <div class="legend-section-title">Active fire</div>
         <div class="legend-grid">
           <div class="legend-item"><div class="legend-sq" style="background:#ff5500;border:1px solid #cc2200;opacity:0.85"></div>Fire perimeters (NIFC)</div>
           <div class="legend-item"><div class="legend-dot" style="background:#ff2200;border:2px solid #cc0000;width:10px;height:10px"></div>NASA FIRMS hotspot</div>
         </div>
-
         <div class="legend-divider"></div>
         <div class="legend-section-title">Fire weather &amp; spread</div>
         <div class="legend-grid">
@@ -287,7 +264,6 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
           <div class="legend-item"><div class="legend-dash" style="border-color:#c4420a"></div>1-hour spread radius</div>
           <div class="legend-item"><div class="legend-dot" style="background:#fff;border:2px solid #1a1814;font-size:10px;display:flex;align-items:center;justify-content:center">↑</div>Wind direction</div>
         </div>
-
         <div class="legend-divider"></div>
         <div class="legend-section-title">NIFC 7-day fire potential</div>
         <div class="legend-grid">
@@ -297,11 +273,9 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
           <div class="legend-item"><div class="legend-dot" style="background:#fff0f0;border-color:#8b0000"></div><span style="color:#8b0000;font-weight:500">Critical</span></div>
         </div>
       </div>
-
     </div>
   </div>
 
-  <!-- Below grid: expanded social feed -->
   <div class="below-grid-full" id="social-section" style="display:none">
     <div class="card social-panel visible" id="social-panel">
       <div class="card-title">Emergency intelligence feed</div>
@@ -331,60 +305,15 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
   <div class="footer-sources">
     <div class="footer-sources-title">Data sources</div>
     <div class="sources-grid">
-      <div class="source-item">
-        <div class="source-name">U.S. Drought Monitor</div>
-        <div class="source-org">NDMC / USDA / NOAA</div>
-        <div class="source-url"><a href="https://droughtmonitor.unl.edu" target="_blank">droughtmonitor.unl.edu</a></div>
-        <div class="source-desc">Weekly D0–D4 drought classification. Updated every Thursday.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Fire perimeters (YTD)</div>
-        <div class="source-org">WFIGS / NIFC</div>
-        <div class="source-url"><a href="https://data-nifc.opendata.arcgis.com" target="_blank">data-nifc.opendata.arcgis.com</a></div>
-        <div class="source-desc">Current-year wildfire perimeters updated continuously during fire season.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Red flag warnings</div>
-        <div class="source-org">NOAA / National Weather Service</div>
-        <div class="source-url"><a href="https://api.weather.gov" target="_blank">api.weather.gov</a></div>
-        <div class="source-desc">Active fire weather watches and red flag warnings from NWS forecast zones.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Live weather conditions</div>
-        <div class="source-org">Open-Meteo</div>
-        <div class="source-url"><a href="https://open-meteo.com" target="_blank">open-meteo.com</a></div>
-        <div class="source-desc">Current temperature, humidity, wind speed and gusts. Free, no API key required.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">ISO fire protection class</div>
-        <div class="source-org">ISO / Verisk (estimated)</div>
-        <div class="source-url"><a href="https://www.isomitigation.com" target="_blank">isomitigation.com</a></div>
-        <div class="source-desc">Estimated PPC based on distance to fire station and urbanization. Verify with ISO directly for binding underwriting decisions.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Tribal social feeds</div>
-        <div class="source-org">X / Twitter public search</div>
-        <div class="source-url"><a href="https://twitter.com/search" target="_blank">twitter.com/search</a></div>
-        <div class="source-desc">Public posts from tribal emergency management accounts and wildfire hashtags near the assessed location.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Geocoding</div>
-        <div class="source-org">Google Maps Platform</div>
-        <div class="source-url"><a href="https://developers.google.com/maps/documentation/geocoding" target="_blank">developers.google.com/maps</a></div>
-        <div class="source-desc">Address-to-coordinate resolution and reverse geocoding.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">Vegetation &amp; WUI zones</div>
-        <div class="source-org">USFS / LANDFIRE (regional heuristic)</div>
-        <div class="source-url"><a href="https://www.landfire.gov" target="_blank">landfire.gov</a></div>
-        <div class="source-desc">State-level vegetation risk and WUI density classification.</div>
-      </div>
-      <div class="source-item">
-        <div class="source-name">NIFC 7-Day Fire Potential</div>
-        <div class="source-org">National Interagency Coordination Center (NICC)</div>
-        <div class="source-url"><a href="https://fsapps.nwcg.gov/psp/npsg/forecast/" target="_blank">fsapps.nwcg.gov</a></div>
-        <div class="source-desc">Daily 7-day significant fire potential forecast by predictive service area. Normal / Elevated / Above Normal / Critical. Updated daily by NIFC predictive services staff.</div>
-      </div>
+      <div class="source-item"><div class="source-name">U.S. Drought Monitor</div><div class="source-org">NDMC / USDA / NOAA</div><div class="source-url"><a href="https://droughtmonitor.unl.edu" target="_blank">droughtmonitor.unl.edu</a></div><div class="source-desc">Weekly D0–D4 drought classification. Updated every Thursday.</div></div>
+      <div class="source-item"><div class="source-name">Fire perimeters (YTD)</div><div class="source-org">WFIGS / NIFC</div><div class="source-url"><a href="https://data-nifc.opendata.arcgis.com" target="_blank">data-nifc.opendata.arcgis.com</a></div><div class="source-desc">Current-year wildfire perimeters updated continuously during fire season.</div></div>
+      <div class="source-item"><div class="source-name">Red flag warnings</div><div class="source-org">NOAA / National Weather Service</div><div class="source-url"><a href="https://api.weather.gov" target="_blank">api.weather.gov</a></div><div class="source-desc">Active fire weather watches and red flag warnings from NWS forecast zones.</div></div>
+      <div class="source-item"><div class="source-name">Live weather conditions</div><div class="source-org">Open-Meteo</div><div class="source-url"><a href="https://open-meteo.com" target="_blank">open-meteo.com</a></div><div class="source-desc">Current temperature, humidity, wind speed and gusts. Free, no API key required.</div></div>
+      <div class="source-item"><div class="source-name">Geocoding &amp; Basemap</div><div class="source-org">Google Maps Platform</div><div class="source-url"><a href="https://developers.google.com/maps" target="_blank">developers.google.com/maps</a></div><div class="source-desc">Address geocoding, reverse geocoding, Places Autocomplete, and satellite/road basemap tiles.</div></div>
+      <div class="source-item"><div class="source-name">NASA FIRMS hotspots</div><div class="source-org">NASA EOSDIS / GIBS</div><div class="source-url"><a href="https://firms.modaps.eosdis.nasa.gov" target="_blank">firms.modaps.eosdis.nasa.gov</a></div><div class="source-desc">VIIRS 375m thermal anomaly detections from NOAA-20 and Suomi NPP satellites. Updated every ~12 hours.</div></div>
+      <div class="source-item"><div class="source-name">NIFC 7-Day Fire Potential</div><div class="source-org">National Interagency Coordination Center</div><div class="source-url"><a href="https://fsapps.nwcg.gov/psp/npsg/forecast/" target="_blank">fsapps.nwcg.gov</a></div><div class="source-desc">Daily 7-day significant fire potential forecast. Normal / Elevated / Above Normal / Critical.</div></div>
+      <div class="source-item"><div class="source-name">ISO fire protection class</div><div class="source-org">ISO / Verisk (estimated)</div><div class="source-url"><a href="https://www.isomitigation.com" target="_blank">isomitigation.com</a></div><div class="source-desc">Estimated PPC based on urbanization and state. Verify with ISO directly for binding decisions.</div></div>
+      <div class="source-item"><div class="source-name">Vegetation &amp; WUI zones</div><div class="source-org">USFS / LANDFIRE (regional heuristic)</div><div class="source-url"><a href="https://www.landfire.gov" target="_blank">landfire.gov</a></div><div class="source-desc">State-level vegetation risk and WUI density classification.</div></div>
     </div>
   </div>
   <div class="footer-bottom">
@@ -399,7 +328,26 @@ const API_KEY = "AIzaSyDomOvPPEUknUqFW-QFo3Eh6OD-g3lorVs";
 let map, marker, droughtLayer, fireLayer, redFlagLayer, firmsLayer, windLayer, currentResult = null;
 
 document.getElementById('hdr-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
-document.getElementById('addr').addEventListener('keydown', e => { if(e.key==='Enter') runSearch(); });
+
+// ── Google Places Autocomplete ─────────────────────────────────────────────
+function initAutocomplete() {
+  const input = document.getElementById('addr');
+  const autocomplete = new google.maps.places.Autocomplete(input, {
+    componentRestrictions: { country: 'us' },
+    fields: ['formatted_address','geometry'],
+  });
+  autocomplete.addListener('place_changed', () => {
+    const place = autocomplete.getPlace();
+    if (place.geometry?.location) {
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      document.getElementById('addr').value = place.formatted_address;
+      runFromCoords(lat, lng);
+    }
+  });
+  // Still allow Enter key to trigger search
+  input.addEventListener('keydown', e => { if(e.key==='Enter') runSearch(); });
+}
 
 function setStatus(msg, loading=false) {
   document.getElementById('status-text').textContent = msg;
@@ -407,7 +355,6 @@ function setStatus(msg, loading=false) {
 }
 
 let pinModeActive = false;
-
 function togglePinMode() {
   pinModeActive = !pinModeActive;
   const bar = document.getElementById('pin-mode-bar');
@@ -423,23 +370,21 @@ function initMap(lat, lng) {
   if (!map) {
     map = L.map('map').setView([lat, lng], 11);
 
-    const basemap = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
-      attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
+    // Google Maps road tiles
+    const basemap = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      attribution: '&copy; Google Maps',
+      maxZoom: 20,
+      subdomains: ['mt0','mt1','mt2','mt3']
     }).addTo(map);
 
-    // Add FIRMS hotspot layer by default
     addFIRMSLayerMercator();
-
-    // Layer control — updated after assessment runs to include all layers
     map._baseMapLayer = basemap;
     updateLayerControl();
 
-    // Pin drop click handler
     map.on('click', async (e) => {
       if (!pinModeActive) return;
       const { lat, lng } = e.latlng;
-      document.getElementById('pin-coords').textContent =
-        `${lat.toFixed(5)}, ${lng.toFixed(5)} — running assessment...`;
+      document.getElementById('pin-coords').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)} — running assessment...`;
       pinModeActive = false;
       document.getElementById('pin-mode-bar').style.display = 'none';
       document.getElementById('map').classList.remove('pin-mode');
@@ -459,7 +404,7 @@ function updateLayerControl() {
   if (droughtLayer) overlays['💧 Drought monitor (NDMC)'] = droughtLayer;
   if (windLayer)    overlays['💨 Wind direction'] = windLayer;
   map._layerControl = L.control.layers(
-    { 'Light basemap': map._baseMapLayer },
+    { 'Google Maps': map._baseMapLayer },
     overlays,
     { collapsed: true, position: 'bottomleft' }
   ).addTo(map);
@@ -469,10 +414,8 @@ function droughtColor(dm) {
   return ['#fffacd','#f5c518','#e07b00','#cc2200','#7a0000'][dm] || '#fffacd';
 }
 
-// ── Drought: Open-Meteo soil/precip calculation (CORS-free, no key needed) ────
 async function addDroughtLayer(lat, lng) {
   if (droughtLayer) map.removeLayer(droughtLayer);
-  // Attempt ArcGIS map layer (bonus visual — not required for scoring)
   const arcUrls = [
     `https://services.arcgis.com/jIL9msH9OI208GCb/arcgis/rest/services/US_Drought_Monitor_Current/FeatureServer/0/query?where=1%3D1&outFields=DM&geometry=${lng-6}%2C${lat-6}%2C${lng+6}%2C${lat+6}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=geojson`,
     `https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/US_Drought_Monitor_Current/FeatureServer/0/query?where=1%3D1&outFields=DM&geometry=${lng-6}%2C${lat-6}%2C${lng+6}%2C${lat+6}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=geojson`,
@@ -490,12 +433,11 @@ async function addDroughtLayer(lat, lng) {
             l.bindPopup(`<b>Drought:</b> ${lvl[f.properties.DM] ?? 'Unknown'}`);
           }
         }).addTo(map);
-        console.log('Drought map layer loaded');
         return data.features;
       }
     } catch(e) { console.warn('ArcGIS drought map unavailable'); }
   }
-  return null; // scoring handled by fetchDroughtIndex
+  return null;
 }
 
 async function fetchDroughtIndex(lat, lng) {
@@ -507,51 +449,27 @@ async function fetchDroughtIndex(lat, lng) {
   const d = await r.json();
   const daily = d.daily;
   const hourly = d.hourly;
-
-  // 30-day precip deficit vs 90-day average
   const p30 = daily.precipitation_sum.slice(-30).reduce((a,b) => a+(b||0), 0);
   const p90 = daily.precipitation_sum.slice(-90).reduce((a,b) => a+(b||0), 0);
   const avgD = p90 / 90;
   const deficitPct = avgD*30 > 0 ? Math.max(0, (avgD*30 - p30) / (avgD*30)) : 0;
-
-  // Soil moisture top 9cm (last 7 days)
   const sm1 = hourly.soil_moisture_0_to_1cm.slice(-168).filter(v=>v!=null);
   const sm3 = hourly.soil_moisture_1_to_3cm.slice(-168).filter(v=>v!=null);
   const sm9 = hourly.soil_moisture_3_to_9cm.slice(-168).filter(v=>v!=null);
-  const avgSM = sm1.length ? (
-    sm1.reduce((a,b)=>a+b,0)/sm1.length*0.3 +
-    sm3.reduce((a,b)=>a+b,0)/sm3.length*0.3 +
-    sm9.reduce((a,b)=>a+b,0)/sm9.length*0.4
-  ) : 0.2;
+  const avgSM = sm1.length ? (sm1.reduce((a,b)=>a+b,0)/sm1.length*0.3 + sm3.reduce((a,b)=>a+b,0)/sm3.length*0.3 + sm9.reduce((a,b)=>a+b,0)/sm9.length*0.4) : 0.2;
   const smScore = avgSM < 0.08 ? 1.0 : avgSM < 0.12 ? 0.8 : avgSM < 0.18 ? 0.5 : avgSM < 0.25 ? 0.2 : 0.0;
-
-  // Water balance (precip - ET)
   const et30 = daily.et0_fao_evapotranspiration.slice(-30).reduce((a,b)=>a+(b||0),0);
   const wb = p30 - et30;
   const wbScore = wb < -80 ? 1.0 : wb < -40 ? 0.7 : wb < -10 ? 0.4 : wb < 0 ? 0.2 : 0.0;
-
-  // Vapor pressure deficit
   const vpd = daily.vapor_pressure_deficit_max.slice(-7).filter(v=>v!=null);
   const avgVPD = vpd.length ? vpd.reduce((a,b)=>a+b,0)/vpd.length : 0;
   const vpdScore = avgVPD > 4.0 ? 1.0 : avgVPD > 2.5 ? 0.7 : avgVPD > 1.5 ? 0.4 : avgVPD > 0.8 ? 0.2 : 0.0;
-
   const idx = deficitPct*0.35 + smScore*0.35 + wbScore*0.20 + vpdScore*0.10;
   const dm = idx >= 0.80 ? 4 : idx >= 0.60 ? 3 : idx >= 0.40 ? 2 : idx >= 0.20 ? 1 : idx >= 0.08 ? 0 : -1;
-
-  return {
-    dm, idx,
-    detail: {
-      precipDeficitPct: Math.round(deficitPct*100),
-      soilMoisture: avgSM.toFixed(3),
-      waterBalance: Math.round(wb),
-      vpd: avgVPD.toFixed(2)
-    }
-  };
+  return { dm, idx, detail: { precipDeficitPct: Math.round(deficitPct*100), soilMoisture: avgSM.toFixed(3), waterBalance: Math.round(wb), vpd: avgVPD.toFixed(2) } };
 }
 
-// ── Core scoring ──────────────────────────────────────────────────────────────
 function getDroughtScore(arcFeatures, calc) {
-  // Prefer NDMC/ArcGIS authoritative data when available
   if (arcFeatures?.length) {
     let maxDM = -1;
     for (const f of arcFeatures)
@@ -562,17 +480,10 @@ function getDroughtScore(arcFeatures, calc) {
       return { score: scores[maxDM], label: labels[maxDM] + ' (NDMC)', dm: maxDM };
     }
   }
-  // Open-Meteo calculated fallback — always available
   if (calc) {
     const scores = [10,30,55,75,100];
     const labels = ['D0 Abnormally dry','D1 Moderate drought','D2 Severe drought','D3 Extreme drought','D4 Exceptional drought'];
-    if (calc.dm >= 0) {
-      return {
-        score: scores[calc.dm],
-        label: `${labels[calc.dm]} — precip deficit ${calc.detail.precipDeficitPct}%, soil moisture ${calc.detail.soilMoisture}`,
-        dm: calc.dm
-      };
-    }
+    if (calc.dm >= 0) return { score: scores[calc.dm], label: `${labels[calc.dm]} — precip deficit ${calc.detail.precipDeficitPct}%, soil moisture ${calc.detail.soilMoisture}`, dm: calc.dm };
     return { score: 5, label: `No drought detected — soil moisture ${calc.detail.soilMoisture}, precip deficit ${calc.detail.precipDeficitPct}%`, dm: -1 };
   }
   return { score: 5, label: 'Drought data unavailable', dm: -1 };
@@ -598,178 +509,85 @@ async function addFireLayer(lat, lng) {
   return 0;
 }
 
-// ── NASA FIRMS hotspots via GIBS WMS (no key, no CORS issues) ────────────────
-// VIIRS 375m — updated every ~12 hours, 3 satellites for near-continuous coverage
-// Red = high confidence active fire, Orange = nominal, Yellow = low confidence
-function addFIRMSLayer() {
-  if (firmsLayer) map.removeLayer(firmsLayer);
-
-  // Today's date for the WMS time parameter
-  const today = new Date().toISOString().split('T')[0];
-
-  // NASA GIBS WMS — VIIRS NOAA-20 375m I-Band (highest resolution available)
-  firmsLayer = L.tileLayer.wms(
-    'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi', {
-      layers: 'VIIRS_NOAA20_Thermal_Anomalies_375m_All',
-      format: 'image/png',
-      transparent: true,
-      version: '1.3.0',
-      time: today,
-      opacity: 0.85,
-      attribution: 'NASA FIRMS VIIRS NOAA-20',
-      // GIBS uses EPSG:4326 tiles — need a custom CRS for Leaflet
-      crs: L.CRS.EPSG4326,
-    }
-  ).addTo(map);
-
-  console.log('NASA FIRMS VIIRS layer added for', today);
-}
-
-// ── NASA FIRMS hotspots — GIBS WMTS (most reliable, no key, CORS-enabled) ────
-// VIIRS NOAA-20 375m resolution, updated every ~12 hours
-// Red/orange dots = active fire detections
+// ── NASA FIRMS — GIBS WMTS, maxNativeZoom:9 so tiles stretch at higher zoom ──
 function addFIRMSLayerMercator() {
   if (firmsLayer) { try { map.removeLayer(firmsLayer); } catch(e) {} }
-
   const today = new Date().toISOString().split('T')[0];
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
-  // Try today's data first, fall back to yesterday if no tiles
   firmsLayer = L.tileLayer(
     `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Thermal_Anomalies_375m_All/default/${today}/GoogleMapsCompatible/{z}/{y}/{x}.png`,
-    {
-      opacity: 0.9,
-      attribution: '🛰️ NASA FIRMS VIIRS NOAA-20',
-      maxNativeZoom: 9,
-      maxZoom: 18,
-      errorTileUrl: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Thermal_Anomalies_375m_All/default/${yesterday}/GoogleMapsCompatible/{z}/{y}/{x}.png`,
-    }
+    { opacity: 1.0, attribution: '🛰️ NASA FIRMS VIIRS NOAA-20', maxNativeZoom: 9, maxZoom: 20,
+      errorTileUrl: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Thermal_Anomalies_375m_All/default/${yesterday}/GoogleMapsCompatible/{z}/{y}/{x}.png` }
   );
-
-  // Also load Suomi NPP for redundancy (second satellite)
   const firmsLayer2 = L.tileLayer(
     `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/${today}/GoogleMapsCompatible/{z}/{y}/{x}.png`,
-    { opacity: 0.9, attribution: '🛰️ NASA FIRMS VIIRS S-NPP', maxNativeZoom: 9, maxZoom: 18 }
+    { opacity: 0.9, attribution: '🛰️ NASA FIRMS VIIRS S-NPP', maxNativeZoom: 9, maxZoom: 20 }
   );
-
   firmsLayer.addTo(map);
   firmsLayer2.addTo(map);
-
-  // Store both for layer control
   map._firmsNPP = firmsLayer2;
-  console.log('NASA FIRMS layers added —', today);
 }
 
-// ── Wind animation + fire spread prediction ──────────────────────────────────
 function addWindLayer(lat, lng, windDir, windSpeed) {
   if (windLayer) { try { map.removeLayer(windLayer); } catch(e) {} }
   if (!windDir || !windSpeed) return;
-
   const cardinal = getWindCardinal(windDir);
-
-  // Wind direction arrow at property
   const arrowIcon = L.divIcon({
     className: '',
-    html: `<div style="
-      width:44px;height:44px;
-      display:flex;align-items:center;justify-content:center;
-      background:rgba(255,255,255,0.95);
-      border:2px solid #1a1814;
-      border-radius:50%;
-      box-shadow:0 2px 6px rgba(0,0,0,0.3);
-      font-size:20px;
-      transform:rotate(${windDir}deg);
-    ">↑</div>`,
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
+    html: `<div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.95);border:2px solid #1a1814;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:20px;transform:rotate(${windDir}deg)">↑</div>`,
+    iconSize: [44,44], iconAnchor: [22,22],
   });
-
   windLayer = L.layerGroup();
-
-  // Wind arrow marker
-  L.marker([lat, lng], { icon: arrowIcon, zIndexOffset: 1000 })
-    .bindPopup(`<b>Wind: ${windSpeed} mph from ${cardinal}</b><br>
-                <small>Arrow shows wind direction →<br>
-                Fire would spread in this direction</small>`)
+  L.marker([lat,lng], { icon: arrowIcon, zIndexOffset: 1000 })
+    .bindPopup(`<b>Wind: ${windSpeed} mph from ${cardinal}</b><br><small>Arrow shows wind direction</small>`)
     .addTo(windLayer);
-
-  // Fire spread prediction cone — shows probable spread direction
-  // Fire travels in the wind direction (downwind), cone widens with speed
   if (windSpeed >= 8) {
-    const spreadDir = (windDir + 180) % 360; // fire moves downwind
-    const coneAngle = windSpeed > 25 ? 25 : windSpeed > 15 ? 35 : 45; // narrower cone = faster/more directed spread
-    const spreadDistDeg = windSpeed > 30 ? 0.18 : windSpeed > 20 ? 0.12 : 0.08; // reach ~5-12 miles
-
-    // Build cone polygon
+    const spreadDir = (windDir + 180) % 360;
+    const coneAngle = windSpeed > 25 ? 25 : windSpeed > 15 ? 35 : 45;
+    const spreadDistDeg = windSpeed > 30 ? 0.18 : windSpeed > 20 ? 0.12 : 0.08;
     const rad = (deg) => deg * Math.PI / 180;
-    const points = [[lat, lng]];
+    const points = [[lat,lng]];
     for (let a = -coneAngle; a <= coneAngle; a += 5) {
       const angle = rad(spreadDir + a);
-      points.push([
-        lat + Math.cos(angle) * spreadDistDeg,
-        lng + Math.sin(angle) * spreadDistDeg / Math.cos(rad(lat))
-      ]);
+      points.push([lat + Math.cos(angle)*spreadDistDeg, lng + Math.sin(angle)*spreadDistDeg/Math.cos(rad(lat))]);
     }
-    points.push([lat, lng]);
-
+    points.push([lat,lng]);
     const coneColor = windSpeed > 25 ? '#8b0000' : windSpeed > 15 ? '#c4420a' : '#e07b00';
-    L.polygon(points, {
-      color: coneColor,
-      fillColor: coneColor,
-      fillOpacity: 0.12,
-      weight: 1.5,
-      dashArray: '4 4',
-    }).bindPopup(`<b>Probable fire spread direction</b><br>
-                  Wind: ${windSpeed} mph from ${cardinal}<br>
-                  <small>Cone shows potential spread zone.<br>
-                  Terrain, fuel load, and humidity affect actual spread.</small>`)
-     .addTo(windLayer);
-
-    // Distance ring at estimated 1-hour spread
-    const spreadRateMph = windSpeed * 0.3; // rough fire spread rate (mph) relative to wind
-    const ringDeg = spreadRateMph / 69; // degrees per mile
-    L.circle([lat, lng], {
-      radius: ringDeg * 111000,
-      color: coneColor,
-      fillOpacity: 0,
-      weight: 1,
-      dashArray: '3 6',
-    }).bindPopup(`Estimated ~1hr fire spread radius at current wind speed`)
-     .addTo(windLayer);
+    L.polygon(points, { color:coneColor, fillColor:coneColor, fillOpacity:0.12, weight:1.5, dashArray:'4 4' })
+      .bindPopup(`<b>Probable fire spread direction</b><br>Wind: ${windSpeed} mph from ${cardinal}`)
+      .addTo(windLayer);
+    const ringDeg = (windSpeed * 0.3) / 69;
+    L.circle([lat,lng], { radius: ringDeg*111000, color:coneColor, fillOpacity:0, weight:1, dashArray:'3 6' })
+      .addTo(windLayer);
   }
-
   windLayer.addTo(map);
   updateLayerControl();
 }
 
 function getWindCardinal(deg) {
   const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-  return dirs[Math.round(deg / 22.5) % 16];
+  return dirs[Math.round(deg/22.5)%16];
 }
 
-// ── NEW: NOAA Red Flag Warnings ──────────────────────────────────────────────
 async function fetchRedFlagWarnings(lat, lng) {
   try {
     const ptRes = await fetch(`https://api.weather.gov/points/${lat.toFixed(4)},${lng.toFixed(4)}`);
     const ptData = await ptRes.json();
     const zone = ptData.properties?.fireWeatherZone || ptData.properties?.forecastZone;
     if (!zone) return null;
-
     const alertRes = await fetch(`https://api.weather.gov/alerts/active?zone=${zone.split('/').pop()}&event=Red%20Flag%20Warning`);
     const alertData = await alertRes.json();
     if (alertData.features?.length) {
       const alert = alertData.features[0].properties;
       return { headline: alert.headline, description: alert.description?.substring(0,200)+'...', expires: alert.expires };
     }
-
-    // Also check fire weather watches
     const watchRes = await fetch(`https://api.weather.gov/alerts/active?zone=${zone.split('/').pop()}&event=Fire%20Weather%20Watch`);
     const watchData = await watchRes.json();
     if (watchData.features?.length) {
       const alert = watchData.features[0].properties;
       return { headline: alert.headline, description: alert.description?.substring(0,200)+'...', expires: alert.expires, isWatch: true };
     }
-  } catch(e) { console.error('Red flag error',e); }
+  } catch(e) {}
   return null;
 }
 
@@ -782,14 +600,13 @@ function renderRedFlag(alert) {
   document.getElementById('redflag-desc').textContent = `${alert.headline || ''} — Expires: ${exp}`;
 }
 
-// ── NEW: Live Weather (Open-Meteo, no key required) ──────────────────────────
 async function fetchWeather(lat, lng) {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_gusts_10m&wind_speed_unit=mph&temperature_unit=fahrenheit`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m&wind_speed_unit=mph&temperature_unit=fahrenheit`;
     const r = await fetch(url);
     const d = await r.json();
     return d.current;
-  } catch(e) { console.error('Weather error',e); return null; }
+  } catch(e) { return null; }
 }
 
 function renderWeather(wx) {
@@ -797,51 +614,33 @@ function renderWeather(wx) {
   if (!wx) { strip.classList.remove('visible'); return; }
   strip.classList.add('visible');
   document.getElementById('wx-spacer').style.display = 'block';
-
   const temp = Math.round(wx.temperature_2m);
   const humidity = Math.round(wx.relative_humidity_2m);
   const wind = Math.round(wx.wind_speed_10m);
   const gust = Math.round(wx.wind_gusts_10m);
   const windDir = wx.wind_direction_10m || 0;
-
   document.getElementById('wx-temp-val').textContent = temp + '°F';
   document.getElementById('wx-humidity-val').textContent = humidity + '%';
   document.getElementById('wx-wind-val').textContent = wind + ' mph ' + getWindCardinal(windDir);
   document.getElementById('wx-gust-val').textContent = gust + ' mph';
-
-  // Highlight danger thresholds
   document.getElementById('wx-humidity').className = 'wx-cell' + (humidity < 15 ? ' wx-warn' : '');
   document.getElementById('wx-wind').className = 'wx-cell' + (wind > 25 ? ' wx-warn' : '');
   document.getElementById('wx-gust').className = 'wx-cell' + (gust > 35 ? ' wx-warn' : '');
-
-  // Add wind direction arrow overlay to map
-  if (map) {
-    const center = map.getCenter();
-    addWindLayer(center.lat, center.lng, windDir, wind);
-  }
-
+  if (map) { const center = map.getCenter(); addWindLayer(center.lat, center.lng, windDir, wind); }
   return { temp, humidity, wind, gust, windDir };
 }
 
-// ── NEW: ISO Fire Protection Class (estimated) ────────────────────────────────
 async function getISOClass(lat, lng, state) {
-  // Estimate PPC based on NWS station proximity heuristic + urbanization
-  // Real PPC requires ISO/Verisk data license — this is an estimate for display
   try {
     const r = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&result_type=locality|sublocality&key=${API_KEY}`);
     const d = await r.json();
     const isUrban = d.results?.length > 0;
-    const isSuburban = d.results?.some(r => r.types.includes('sublocality'));
-
-    // Western rural states have higher PPC numbers (worse coverage)
     const ruralWest = ['AZ','NM','NV','UT','ID','MT','WY','OR','WA','CO'].includes(state);
-
     let ppc, label, color;
     if (isUrban && !ruralWest) { ppc = '2–3'; label = 'Good urban coverage'; color = '#2d6a2d'; }
     else if (isUrban && ruralWest) { ppc = '4–5'; label = 'Moderate — western urban'; color = '#b07a00'; }
     else if (ruralWest) { ppc = '8–9'; label = 'Limited — rural western'; color = '#c4420a'; }
     else { ppc = '5–6'; label = 'Moderate rural coverage'; color = '#b07a00'; }
-
     return { ppc, label, color, estimated: true };
   } catch(e) {}
   return { ppc: '?', label: 'Unable to estimate', color: '#888', estimated: true };
@@ -852,18 +651,12 @@ function renderISO(iso) {
   card.style.display = 'block';
   document.getElementById('iso-content').innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div>
-        <div class="iso-badge" style="background:${iso.color}22;color:${iso.color};border:1px solid ${iso.color}44">
-          Class ${iso.ppc}
-        </div>
-      </div>
+      <div><div class="iso-badge" style="background:${iso.color}22;color:${iso.color};border:1px solid ${iso.color}44">Class ${iso.ppc}</div></div>
       <div style="font-size:10px;color:var(--muted);font-style:italic">Estimated</div>
     </div>
-    <div style="font-size:12px;color:var(--muted);line-height:1.5">${iso.label}. ISO PPC ranges from 1 (best) to 10 (no coverage). Verify with ISO Mitigation for binding decisions.</div>
-  `;
+    <div style="font-size:12px;color:var(--muted);line-height:1.5">${iso.label}. ISO PPC ranges from 1 (best) to 10 (no coverage). Verify with ISO Mitigation for binding decisions.</div>`;
 }
 
-// ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.feed-tab').forEach((t,i) => {
     const names = ['reddit','nifc','rss','x','youtube'];
@@ -891,47 +684,21 @@ function tagFromText(text) {
   return { cls:'tag-fire', label:'Fire' };
 }
 
-// ── Reddit (live — geo-targeted with relevance scoring) ───────────────────────
 async function fetchRedditFeed(lat, lng, state, county, city) {
-  const stateNames = {
-    AZ:'arizona', NM:'newmexico', CA:'California', OR:'oregon', WA:'washington',
-    MT:'montana', SD:'southdakota', OK:'oklahoma', MN:'minnesota', ID:'idaho',
-    CO:'Colorado', UT:'utah', NV:'nevada', WY:'wyoming', TX:'texas', ND:'northdakota',
-    FL:'florida', GA:'georgia', NC:'northcarolina', AK:'alaska', HI:'hawaii',
-    KS:'kansas', NE:'nebraska', LA:'louisiana', MS:'mississippi', AL:'alabama',
-  };
+  const stateNames = { AZ:'arizona',NM:'newmexico',CA:'California',OR:'oregon',WA:'washington',MT:'montana',SD:'southdakota',OK:'oklahoma',MN:'minnesota',ID:'idaho',CO:'Colorado',UT:'utah',NV:'nevada',WY:'wyoming',TX:'texas',ND:'northdakota',FL:'florida',GA:'georgia',NC:'northcarolina',AK:'alaska',HI:'hawaii',KS:'kansas',NE:'nebraska',LA:'louisiana',MS:'mississippi',AL:'alabama' };
   const stateSub = stateNames[state] || 'wildfire';
-
-  // Build geo-specific search terms from most to least specific
-  const geoTerms = [
-    city && county ? `"${city}" OR "${county}"` : null,
-    city ? `"${city}"` : null,
-    county ? `"${county} County" OR "${county}"` : null,
-    state ? state : null,
-  ].filter(Boolean);
-
+  const geoTerms = [city&&county?`"${city}" OR "${county}"`:null, city?`"${city}"`:null, county?`"${county}"`:`null`, state?state:null].filter(Boolean);
   const primaryGeo = geoTerms[0] || state;
-  const broadGeo = state || 'wildfire';
-
-  // Search matrix: [subreddit, query, relevanceBoost]
-  // Higher relevanceBoost = more weight in scoring
   const searches = [
-    // Highest relevance: geo-specific wildfire posts
-    { sub: 'wildfire',       q: `${primaryGeo} fire OR wildfire OR smoke OR evacuation`,  boost: 10 },
-    { sub: 'wildfire',       q: `${county||state} fire OR drought OR burn`,               boost: 8  },
-    { sub: stateSub,         q: `fire OR wildfire OR smoke OR evacuation OR drought`,      boost: 7  },
-    { sub: stateSub,         q: `${city||county||state} emergency`,                        boost: 6  },
-    // Tribal-specific
-    { sub: 'NativeAmerican', q: `${state} fire OR wildfire OR emergency`,                  boost: 6  },
-    { sub: 'NativeAmerican', q: `tribal fire OR prescribed burn OR BIA`,                   boost: 5  },
-    // Broader context
-    { sub: 'wildfire',       q: `${state} fire 2025`,                                      boost: 4  },
-    { sub: 'preppers',       q: `${state} fire OR wildfire evacuation`,                    boost: 2  },
+    { sub:'wildfire', q:`${primaryGeo} fire OR wildfire OR smoke OR evacuation`, boost:10 },
+    { sub:'wildfire', q:`${county||state} fire OR drought OR burn`, boost:8 },
+    { sub:stateSub, q:`fire OR wildfire OR smoke OR evacuation OR drought`, boost:7 },
+    { sub:'NativeAmerican', q:`${state} fire OR wildfire OR emergency`, boost:6 },
+    { sub:'NativeAmerican', q:`tribal fire OR prescribed burn OR BIA`, boost:5 },
+    { sub:'wildfire', q:`${state} fire 2025`, boost:4 },
   ].filter(s => s.sub && s.q);
-
   const seen = new Set();
   const items = [];
-
   for (const s of searches) {
     try {
       const url = `https://www.reddit.com/r/${s.sub}/search.json?q=${encodeURIComponent(s.q)}&sort=new&limit=6&restrict_sr=1&t=month`;
@@ -942,301 +709,139 @@ async function fetchRedditFeed(lat, lng, state, county, city) {
         const p = post.data;
         if (!p.title || seen.has(p.id)) continue;
         seen.add(p.id);
-
         const fullText = (p.title + ' ' + (p.selftext||'')).toLowerCase();
-
-        // Relevance scoring — geo terms score highest
         let relevance = s.boost;
         if (city && fullText.includes(city.toLowerCase())) relevance += 15;
         if (county && fullText.includes(county.toLowerCase())) relevance += 10;
-        if (state && fullText.includes(state.toLowerCase())) relevance += 5;
-
-        // Keyword relevance
-        const fireTerms = ['wildfire','fire','evacu','smoke','drought','burn','contain','incid','emergency','blaze'];
-        fireTerms.forEach(t => { if (fullText.includes(t)) relevance += 2; });
-
-        // Recency boost — newer posts score higher
-        const ageHours = (Date.now() - p.created_utc * 1000) / 3600000;
+        const ageHours = (Date.now() - p.created_utc*1000) / 3600000;
         if (ageHours < 6) relevance += 12;
         else if (ageHours < 24) relevance += 8;
         else if (ageHours < 72) relevance += 4;
-        else if (ageHours > 720) relevance -= 5; // penalize old posts
-
-        // Engagement boost
-        if (p.score > 100) relevance += 3;
-        if (p.num_comments > 20) relevance += 2;
-
-        items.push({
-          source: `r/${s.sub}`,
-          sourceUrl: `https://reddit.com/r/${s.sub}`,
-          url: `https://reddit.com${p.permalink}`,
-          title: p.title,
-          text: p.selftext ? p.selftext.substring(0, 160) + (p.selftext.length > 160 ? '...' : '') : '',
-          time: new Date(p.created_utc * 1000).toISOString(),
-          score: p.score,
-          comments: p.num_comments,
-          relevance,
-          // Highlight which geo terms matched
-          geoMatch: city && fullText.includes(city.toLowerCase()) ? city :
-                    county && fullText.includes(county.toLowerCase()) ? county : null,
-        });
+        items.push({ source:`r/${s.sub}`, sourceUrl:`https://reddit.com/r/${s.sub}`, url:`https://reddit.com${p.permalink}`, title:p.title, text:p.selftext?p.selftext.substring(0,160)+'...':'', time:new Date(p.created_utc*1000).toISOString(), score:p.score, comments:p.num_comments, relevance, geoMatch:city&&fullText.includes(city.toLowerCase())?city:county&&fullText.includes(county.toLowerCase())?county:null });
       }
-    } catch(e) { console.warn(`Reddit r/${s.sub} failed:`, e.message); }
+    } catch(e) {}
   }
-
-  // Sort by relevance desc, then recency
-  items.sort((a, b) => b.relevance - a.relevance || new Date(b.time) - new Date(a.time));
-  return items.slice(0, 15);
+  items.sort((a,b) => b.relevance-a.relevance || new Date(b.time)-new Date(a.time));
+  return items.slice(0,15);
 }
 
 function renderReddit(items, state, county, city) {
   const el = document.getElementById('feed-reddit');
   document.getElementById('count-reddit').textContent = items.length || '0';
-  if (!items.length) {
-    el.innerHTML = `<div class="feed-empty">No recent wildfire posts found for ${city||county||state}. <a href="https://www.reddit.com/r/wildfire/search/?q=${encodeURIComponent((city||county||state)+' fire')}&sort=new" target="_blank" style="color:var(--accent)">Search Reddit directly &rarr;</a></div>`;
-    return;
-  }
-  const geoLabel = city || county || state;
-  el.innerHTML = `
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid var(--border)">
-      Sorted by relevance to <strong style="color:var(--text)">${geoLabel}</strong> — ${items.length} posts from r/wildfire, r/${state?.toLowerCase()||'local'}, r/NativeAmerican + more
-    </div>
-    ${items.map(item => {
-      const tag = tagFromText(item.title + ' ' + item.text);
-      const geoChip = item.geoMatch
-        ? `<span style="font-size:9px;background:#e8f4fd;color:#1a5fa8;border-radius:8px;padding:1px 6px;font-weight:500">${item.geoMatch}</span>`
-        : '';
-      return `<div class="social-item">
-        <div class="social-header">
-          <div class="social-source"><a href="${item.sourceUrl}" target="_blank">${item.source}</a> ${geoChip}</div>
-          <div class="social-time">${timeAgo(item.time)}</div>
-        </div>
-        <div class="social-text"><a href="${item.url}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:500">${item.title}</a></div>
-        ${item.text ? `<div class="social-sub">${item.text}</div>` : ''}
-        <div style="margin-top:4px;display:flex;gap:8px;align-items:center">
-          <span class="social-tag ${tag.cls}">${tag.label}</span>
-          <span style="font-size:10px;color:var(--muted)">${item.score} pts &middot; ${item.comments} comments</span>
-        </div>
-      </div>`;
-    }).join('')}`;
+  if (!items.length) { el.innerHTML = `<div class="feed-empty">No recent wildfire posts found for ${city||county||state}.</div>`; return; }
+  el.innerHTML = items.map(item => {
+    const tag = tagFromText(item.title + ' ' + item.text);
+    const geoChip = item.geoMatch ? `<span style="font-size:9px;background:#e8f4fd;color:#1a5fa8;border-radius:8px;padding:1px 6px;font-weight:500">${item.geoMatch}</span>` : '';
+    return `<div class="social-item"><div class="social-header"><div class="social-source"><a href="${item.sourceUrl}" target="_blank">${item.source}</a> ${geoChip}</div><div class="social-time">${timeAgo(item.time)}</div></div><div class="social-text"><a href="${item.url}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:500">${item.title}</a></div>${item.text?`<div class="social-sub">${item.text}</div>`:''}<span class="social-tag ${tag.cls}">${tag.label}</span></div>`;
+  }).join('');
 }
 
-// ── NIFC Active Incidents (live — NIFC ArcGIS, CORS-enabled) ─────────────────
 async function fetchNIFCIncidents(lat, lng) {
   try {
     const url = `https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0/query?where=1%3D1&outFields=IncidentName,POOState,FireDiscoveryDateTime,IncidentTypeCategory,DailyAcres,PercentContained,POOCounty&geometry=${lng-8}%2C${lat-8}%2C${lng+8}%2C${lat+8}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&orderByFields=DailyAcres+DESC&resultRecordCount=20&f=json`;
     const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!r.ok) return [];
     const d = await r.json();
-    return (d.features || []).map(f => ({
-      name: f.attributes.IncidentName || 'Unknown',
-      state: f.attributes.POOState || '',
-      county: f.attributes.POOCounty || '',
-      type: f.attributes.IncidentTypeCategory || 'WF',
-      acres: f.attributes.DailyAcres ? Math.round(f.attributes.DailyAcres).toLocaleString() : '?',
-      contained: f.attributes.PercentContained != null ? Math.round(f.attributes.PercentContained) : null,
-      discovered: f.attributes.FireDiscoveryDateTime ? new Date(f.attributes.FireDiscoveryDateTime).toISOString() : null,
-    }));
-  } catch(e) { console.warn('NIFC incidents failed:', e.message); return []; }
+    return (d.features||[]).map(f => ({ name:f.attributes.IncidentName||'Unknown', state:f.attributes.POOState||'', county:f.attributes.POOCounty||'', type:f.attributes.IncidentTypeCategory||'WF', acres:f.attributes.DailyAcres?Math.round(f.attributes.DailyAcres).toLocaleString():'?', contained:f.attributes.PercentContained!=null?Math.round(f.attributes.PercentContained):null, discovered:f.attributes.FireDiscoveryDateTime?new Date(f.attributes.FireDiscoveryDateTime).toISOString():null }));
+  } catch(e) { return []; }
 }
 
 function renderNIFC(incidents) {
   const el = document.getElementById('feed-nifc');
   document.getElementById('count-nifc').textContent = incidents.length || '0';
-  if (!incidents.length) {
-    el.innerHTML = '<div class="feed-empty">No active incidents found within ~550 miles of this location.</div>';
-    return;
-  }
+  if (!incidents.length) { el.innerHTML = '<div class="feed-empty">No active incidents found within ~550 miles.</div>'; return; }
   el.innerHTML = incidents.map(inc => {
     const pct = inc.contained != null ? inc.contained : '?';
     const pctColor = pct >= 75 ? '#2d6a2d' : pct >= 40 ? '#b07a00' : '#c4420a';
     const tag = inc.type === 'RX' ? { cls:'tag-safe', label:'Prescribed' } : { cls:'tag-fire', label:'Wildfire' };
-    return `<div class="social-item">
-      <div class="social-header">
-        <div class="social-source" style="color:var(--text);font-weight:600">${inc.name}</div>
-        <div class="social-time">${inc.discovered ? timeAgo(inc.discovered) : ''}</div>
-      </div>
-      <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--muted)">${inc.county ? inc.county+', ' : ''}${inc.state}</span>
-        <span style="font-size:11px;color:var(--text);font-weight:500">${inc.acres} acres</span>
-        <span style="font-size:11px;color:${pctColor};font-weight:500">${pct}% contained</span>
-      </div>
-      <div style="margin-top:4px"><span class="social-tag ${tag.cls}">${tag.label}</span></div>
-    </div>`;
+    return `<div class="social-item"><div class="social-header"><div class="social-source" style="color:var(--text);font-weight:600">${inc.name}</div><div class="social-time">${inc.discovered?timeAgo(inc.discovered):''}</div></div><div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap"><span style="font-size:11px;color:var(--muted)">${inc.county?inc.county+', ':''}${inc.state}</span><span style="font-size:11px;font-weight:500">${inc.acres} acres</span><span style="font-size:11px;color:${pctColor};font-weight:500">${pct}% contained</span></div><span class="social-tag ${tag.cls}">${tag.label}</span></div>`;
   }).join('');
 }
 
-// ── RSS Feeds (FEMA + NWS + InciWeb via allorigins proxy) ────────────────────
 async function fetchRSSFeeds(lat, lng, state) {
   const feeds = [
-    { name: 'FEMA Disaster Declarations', url: 'https://www.fema.gov/api/open/v2/disasterDeclarations.rss', icon: 'FEMA' },
-    { name: 'InciWeb — Active Fires', url: 'https://inciweb.wildfire.gov/feeds/rss/incidents/', icon: 'InciWeb' },
-    { name: 'NWS Fire Weather', url: `https://forecast.weather.gov/MapClick.php?lat=${lat.toFixed(2)}&lon=${lng.toFixed(2)}&unit=0&lg=english&FcstType=feed`, icon: 'NWS' },
+    { name:'FEMA Disaster Declarations', url:'https://www.fema.gov/api/open/v2/disasterDeclarations.rss', icon:'FEMA' },
+    { name:'InciWeb — Active Fires', url:'https://inciweb.wildfire.gov/feeds/rss/incidents/', icon:'InciWeb' },
+    { name:'NWS Fire Weather', url:`https://forecast.weather.gov/MapClick.php?lat=${lat.toFixed(2)}&lon=${lng.toFixed(2)}&unit=0&lg=english&FcstType=feed`, icon:'NWS' },
   ];
-
   const proxy = 'https://api.allorigins.win/get?url=';
   const items = [];
-
   for (const feed of feeds) {
     try {
       const r = await fetch(proxy + encodeURIComponent(feed.url), { signal: AbortSignal.timeout(8000) });
       if (!r.ok) continue;
       const d = await r.json();
       const xml = new DOMParser().parseFromString(d.contents, 'text/xml');
-      const entries = xml.querySelectorAll('item');
-      for (const entry of Array.from(entries).slice(0, 5)) {
+      for (const entry of Array.from(xml.querySelectorAll('item')).slice(0,5)) {
         const title = entry.querySelector('title')?.textContent || '';
         const desc = entry.querySelector('description')?.textContent?.replace(/<[^>]*>/g,'').substring(0,160) || '';
         const link = entry.querySelector('link')?.textContent || '';
         const pubDate = entry.querySelector('pubDate')?.textContent || '';
         if (!title) continue;
-        items.push({ source: feed.name, icon: feed.icon, title, desc, link, pubDate: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString() });
+        items.push({ source:feed.name, icon:feed.icon, title, desc, link, pubDate:pubDate?new Date(pubDate).toISOString():new Date().toISOString() });
       }
-    } catch(e) { console.warn(`RSS ${feed.name} failed:`, e.message); }
+    } catch(e) {}
   }
-
-  items.sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate));
-  return items.slice(0, 15);
+  items.sort((a,b) => new Date(b.pubDate)-new Date(a.pubDate));
+  return items.slice(0,15);
 }
 
 function renderRSS(items) {
   const el = document.getElementById('feed-rss');
   document.getElementById('count-rss').textContent = items.length || '0';
-  if (!items.length) {
-    el.innerHTML = '<div class="feed-empty">RSS feeds temporarily unavailable. <a href="https://inciweb.wildfire.gov" target="_blank" style="color:var(--accent)">Visit InciWeb directly &rarr;</a></div>';
-    return;
-  }
+  if (!items.length) { el.innerHTML = '<div class="feed-empty">RSS feeds temporarily unavailable. <a href="https://inciweb.wildfire.gov" target="_blank" style="color:var(--accent)">Visit InciWeb &rarr;</a></div>'; return; }
   el.innerHTML = items.map(item => {
     const tag = tagFromText(item.title + ' ' + item.desc);
-    return `<div class="social-item">
-      <div class="social-header">
-        <div class="social-source">${item.icon} — ${item.source}</div>
-        <div class="social-time">${timeAgo(item.pubDate)}</div>
-      </div>
-      <div class="social-text">${item.link ? `<a href="${item.link}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:500">${item.title}</a>` : item.title}</div>
-      ${item.desc ? `<div class="social-sub">${item.desc}</div>` : ''}
-      <span class="social-tag ${tag.cls}">${tag.label}</span>
-    </div>`;
+    return `<div class="social-item"><div class="social-header"><div class="social-source">${item.icon} — ${item.source}</div><div class="social-time">${timeAgo(item.pubDate)}</div></div><div class="social-text">${item.link?`<a href="${item.link}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:500">${item.title}</a>`:item.title}</div>${item.desc?`<div class="social-sub">${item.desc}</div>`:''}<span class="social-tag ${tag.cls}">${tag.label}</span></div>`;
   }).join('');
 }
 
-// ── X / Twitter (search links — API requires OAuth) ───────────────────────────
 function renderXTab(lat, lng, state, accounts) {
   const el = document.getElementById('feed-x');
   document.getElementById('count-x').textContent = '↗';
   const queries = [
-    { label: 'Wildfire near location', q: `wildfire OR fire OR evacuation near:${lat.toFixed(2)},${lng.toFixed(2)} within:100mi` },
-    { label: 'Tribal emergency accounts', q: accounts.slice(0,3).join(' OR ') + ' fire OR wildfire OR emergency' },
-    { label: 'State fire news', q: `${state} wildfire 2025` },
-    { label: 'NIFC / BIA fire alerts', q: 'from:NIFC_Fire OR from:BIA_Indian_Affairs fire OR wildfire' },
+    { label:'Wildfire near location', q:`wildfire OR fire OR evacuation near:${lat.toFixed(2)},${lng.toFixed(2)} within:100mi` },
+    { label:'Tribal emergency accounts', q:accounts.slice(0,3).join(' OR ')+' fire OR wildfire OR emergency' },
+    { label:'State fire news', q:`${state} wildfire 2025` },
+    { label:'NIFC / BIA fire alerts', q:'from:NIFC_Fire OR from:BIA_Indian_Affairs fire OR wildfire' },
   ];
-  el.innerHTML = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-      X/Twitter requires login to view results. Click any search below to open directly in X.
-    </div>
-    ${queries.map(q => `
-      <div class="social-item">
-        <div class="social-text">
-          <a href="https://twitter.com/search?q=${encodeURIComponent(q.q)}&f=live" target="_blank"
-             style="color:var(--accent);text-decoration:none;font-weight:500">${q.label} &rarr;</a>
-        </div>
-        <div class="social-sub" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px">${q.q}</div>
-      </div>`).join('')}
-    <div style="margin-top:12px;font-size:11px;color:var(--muted)">
-      Tribal accounts monitored: ${accounts.join(', ')}
-    </div>`;
+  el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:12px">X/Twitter requires login. Click to open directly.</div>${queries.map(q=>`<div class="social-item"><div class="social-text"><a href="https://twitter.com/search?q=${encodeURIComponent(q.q)}&f=live" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500">${q.label} &rarr;</a></div></div>`).join('')}<div style="margin-top:12px;font-size:11px;color:var(--muted)">Tribal accounts: ${accounts.join(', ')}</div>`;
 }
 
-// ── YouTube (search links — API requires key) ─────────────────────────────────
 function renderYouTubeTab(lat, lng, state, county, city) {
   const el = document.getElementById('feed-youtube');
   document.getElementById('count-youtube').textContent = '↗';
   const geoLabel = city || county || state;
   const searches = [
-    { label: `${geoLabel} wildfire live scanner`, q: `${geoLabel} wildfire fire scanner live 2025` },
-    { label: `${state} tribal emergency broadcasts`, q: `tribal emergency management wildfire ${state}` },
-    { label: 'NIFC fire briefings', q: 'NIFC national interagency fire center briefing 2025' },
-    { label: `${county||state} incident updates`, q: `wildfire incident update ${county||state} 2025` },
+    { label:`${geoLabel} wildfire live scanner`, q:`${geoLabel} wildfire fire scanner live 2025` },
+    { label:`${state} tribal emergency broadcasts`, q:`tribal emergency management wildfire ${state}` },
+    { label:'NIFC fire briefings', q:'NIFC national interagency fire center briefing 2025' },
   ];
-  el.innerHTML = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-      YouTube live feeds and fire briefings for <strong style="color:var(--text)">${geoLabel}</strong>. Click to search directly.
-    </div>
-    ${searches.map(s => `
-      <div class="social-item">
-        <div class="social-text">
-          <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.q)}&sp=EgJAAQ%3D%3D" target="_blank"
-             style="color:var(--accent);text-decoration:none;font-weight:500">${s.label} &rarr;</a>
-        </div>
-        <div class="social-sub" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px">${s.q}</div>
-      </div>`).join('')}`;
+  el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:12px">YouTube live feeds for <strong>${geoLabel}</strong>.</div>${searches.map(s=>`<div class="social-item"><div class="social-text"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.q)}&sp=EgJAAQ%3D%3D" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500">${s.label} &rarr;</a></div></div>`).join('')}`;
 }
 
-// ── Main social fetch orchestrator ────────────────────────────────────────────
 async function fetchAndRenderSocialFeeds(lat, lng, state, county, city) {
   document.getElementById('social-section').style.display = 'block';
-
-  const tribalAccounts = {
-    'AZ': ['@NavajoDEM','@HopiTribe','@WhiteMtnApache','@TohonOodham'],
-    'NM': ['@PuebloOfZuni','@MescaleroApache','@NavajoNation','@SantaAnaPueblo'],
-    'CA': ['@HoopaTribe','@YurokTribe','@RoundValleyTribes','@CherokeeNationCA'],
-    'OR': ['@UmatillaTribe','@WarmSpringsTribe','@GrandRonde','@SiletzTribes'],
-    'WA': ['@TulalipTribes','@LummiNation','@YakamaNation','@MuckleshootTribe'],
-    'MT': ['@BlackfeetNation','@CrowNation','@FlatheadNation','@FortBelknap'],
-    'SD': ['@OglalaSioux','@StandingRock','@CheyenneRiver','@RosebudSioux'],
-    'OK': ['@CherokeeNation','@ChickasawNation','@ChoctawNation','@MuscogeeNation'],
-    'MN': ['@LeechLakeBand','@RedLakeNation','@WhiteEarthNation','@MilleLacsBand'],
-    'ID': ['@NezPerceTribe','@CoeurDAleneTribe','@ShoshoneBannock','@KootenaiTribe'],
-    'CO': ['@SouthernUte','@UteIndiaTribe','@CheyenneArapaho'],
-    'ND': ['@MHANation','@StandingRock','@TurtleMountainBand'],
-    'WY': ['@EasternShoshone','@NorthernArapaho'],
-    'NV': ['@PyramidLakePaiute','@WalkerRiverPaiute','@DuckValleyTribes'],
-    'UT': ['@NavajoNation','@UintahOurayUte','@SkullValleyGoshute'],
-  };
+  const tribalAccounts = { 'AZ':['@NavajoDEM','@HopiTribe','@WhiteMtnApache','@TohonOodham'],'NM':['@PuebloOfZuni','@MescaleroApache','@NavajoNation'],'CA':['@HoopaTribe','@YurokTribe','@RoundValleyTribes'],'OR':['@UmatillaTribe','@WarmSpringsTribe','@GrandRonde'],'WA':['@TulalipTribes','@LummiNation','@YakamaNation'],'MT':['@BlackfeetNation','@CrowNation','@FlatheadNation'],'SD':['@OglalaSioux','@StandingRock','@CheyenneRiver'],'OK':['@CherokeeNation','@ChickasawNation','@ChoctawNation'],'MN':['@LeechLakeBand','@RedLakeNation','@WhiteEarthNation'],'ID':['@NezPerceTribe','@CoeurDAleneTribe','@ShoshoneBannock'],'CO':['@SouthernUte','@UteIndiaTribe'],'ND':['@MHANation','@StandingRock'],'WY':['@EasternShoshone','@NorthernArapaho'],'NV':['@PyramidLakePaiute','@WalkerRiverPaiute'],'UT':['@NavajoNation','@UintahOurayUte'] };
   const accounts = tribalAccounts[state] || ['@TribalEM','@BIA_Indian_Affairs','@NativeFireAlert','@IndianCountryToday'];
-
-  renderXTab(lat, lng, state, accounts);
-  renderYouTubeTab(lat, lng, state, county, city);
-
   const geoLabel = city || county || state;
   document.getElementById('social-search-link').href = `https://twitter.com/search?q=${encodeURIComponent(`wildfire OR fire OR evacuation ${geoLabel}`)}&f=live`;
   document.getElementById('reddit-search-link').href = `https://www.reddit.com/search/?q=${encodeURIComponent(`wildfire ${geoLabel}`)}&sort=new&t=month`;
-
-  const [redditItems, nifcItems, rssItems] = await Promise.all([
-    fetchRedditFeed(lat, lng, state, county, city),
-    fetchNIFCIncidents(lat, lng),
-    fetchRSSFeeds(lat, lng, state),
-  ]);
-
+  renderXTab(lat, lng, state, accounts);
+  renderYouTubeTab(lat, lng, state, county, city);
+  const [redditItems, nifcItems, rssItems] = await Promise.all([fetchRedditFeed(lat, lng, state, county, city), fetchNIFCIncidents(lat, lng), fetchRSSFeeds(lat, lng, state)]);
   renderReddit(redditItems, state, county, city);
   renderNIFC(nifcItems);
   renderRSS(rssItems);
 }
 
-// ── Core scoring ──────────────────────────────────────────────────────────────
-// ── NIFC 7-Day Significant Fire Potential ────────────────────────────────────
-// Layers 0-6 = Day 1 through Day 7
-// Field: potential classification varies by PSA polygon
-// Colors: Normal=green, Elevated=yellow, Above Normal=orange, Critical=red
-
+// ── NIFC 7-Day ────────────────────────────────────────────────────────────────
 const NIFC_BASE = 'https://fsapps.nwcg.gov/psp/arcgis/rest/services/npsg/outlooks_forecast/MapServer';
-
-const FP_LABELS = {
-  'N':  { label: 'Normal',       cls: 'fp-normal',   score: 5  },
-  'E':  { label: 'Elevated',     cls: 'fp-elevated',  score: 35 },
-  'AN': { label: 'Above Normal', cls: 'fp-above',     score: 65 },
-  'C':  { label: 'Critical',     cls: 'fp-critical',  score: 90 },
-  // full text variants
-  'NORMAL':       { label: 'Normal',       cls: 'fp-normal',   score: 5  },
-  'ELEVATED':     { label: 'Elevated',     cls: 'fp-elevated',  score: 35 },
-  'ABOVE NORMAL': { label: 'Above Normal', cls: 'fp-above',     score: 65 },
-  'CRITICAL':     { label: 'Critical',     cls: 'fp-critical',  score: 90 },
-};
+const FP_LABELS = { 'N':{label:'Normal',cls:'fp-normal',score:5},'E':{label:'Elevated',cls:'fp-elevated',score:35},'AN':{label:'Above Normal',cls:'fp-above',score:65},'C':{label:'Critical',cls:'fp-critical',score:90},'NORMAL':{label:'Normal',cls:'fp-normal',score:5},'ELEVATED':{label:'Elevated',cls:'fp-elevated',score:35},'ABOVE NORMAL':{label:'Above Normal',cls:'fp-above',score:65},'CRITICAL':{label:'Critical',cls:'fp-critical',score:90} };
 
 async function fetchNIFC7Day(lat, lng) {
   const days = [];
-  const geom = `${lng - 0.5}%2C${lat - 0.5}%2C${lng + 0.5}%2C${lat + 0.5}`;
-
+  const geom = `${lng-0.5}%2C${lat-0.5}%2C${lng+0.5}%2C${lat+0.5}`;
   for (let i = 0; i < 7; i++) {
     try {
       const url = `${NIFC_BASE}/${i}/query?where=1%3D1&outFields=*&geometry=${geom}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=json&resultRecordCount=1`;
@@ -1244,81 +849,44 @@ async function fetchNIFC7Day(lat, lng) {
       if (!r.ok) { days.push(null); continue; }
       const d = await r.json();
       if (!d.features?.length) { days.push(null); continue; }
-
-      // Field names vary — check common ones
       const attrs = d.features[0].attributes;
-      const raw = attrs.CLASS || attrs.SFP || attrs.POTENTIAL || attrs.potential ||
-                  attrs.SIGNIFICANT_FIRE_POTENTIAL || attrs.Potential ||
-                  Object.values(attrs).find(v => typeof v === 'string' && v.length <= 15) || null;
-
+      const raw = attrs.CLASS||attrs.SFP||attrs.POTENTIAL||attrs.potential||attrs.SIGNIFICANT_FIRE_POTENTIAL||attrs.Potential||Object.values(attrs).find(v=>typeof v==='string'&&v.length<=15)||null;
       const key = raw ? raw.toString().toUpperCase().trim() : null;
-      const fp = key ? (FP_LABELS[key] || { label: raw, cls: 'fp-none', score: 20 }) : null;
+      const fp = key ? (FP_LABELS[key] || { label:raw, cls:'fp-none', score:20 }) : null;
       days.push(fp ? { ...fp, raw, attrs } : null);
-    } catch(e) {
-      console.warn(`NIFC Day ${i+1} failed:`, e.message);
-      days.push(null);
-    }
+    } catch(e) { days.push(null); }
   }
-
-  // Compute 7-day peak and average score
   const valid = days.filter(Boolean);
-  const peakScore = valid.length ? Math.max(...valid.map(d => d.score)) : 0;
-  const avgScore  = valid.length ? Math.round(valid.reduce((s,d)=>s+d.score,0)/valid.length) : 0;
-  const peakDay   = valid.length ? valid.reduce((a,b)=>b.score>a.score?b:a) : null;
-
+  const peakScore = valid.length ? Math.max(...valid.map(d=>d.score)) : 0;
+  const avgScore = valid.length ? Math.round(valid.reduce((s,d)=>s+d.score,0)/valid.length) : 0;
+  const peakDay = valid.length ? valid.reduce((a,b)=>b.score>a.score?b:a) : null;
   return { days, peakScore, avgScore, peakDay, dataAvailable: valid.length > 0 };
 }
 
 function renderNIFCForecast(forecast) {
   const card = document.getElementById('forecast-card');
-  if (!forecast || !forecast.dataAvailable) {
-    card.classList.remove('visible');
-    return;
-  }
+  if (!forecast || !forecast.dataAvailable) { card.classList.remove('visible'); return; }
   card.classList.add('visible');
-
   const peak = forecast.peakDay;
-  const peakColor = peak?.cls === 'fp-critical' ? '#8b0000' :
-                    peak?.cls === 'fp-above'    ? '#c4420a' :
-                    peak?.cls === 'fp-elevated' ? '#b07a00' : '#2d6a2d';
-
-  document.getElementById('forecast-content').innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-      <div style="font-size:20px;font-weight:500;color:${peakColor}">${peak?.label || '—'}</div>
-      <div style="font-size:11px;color:var(--muted)">peak over 7 days</div>
-    </div>
-    <div style="font-size:11px;color:var(--muted)">7-day average score: ${forecast.avgScore}/100 &nbsp;·&nbsp; ${forecast.days.filter(Boolean).length}/7 days with data</div>
-  `;
-
-  const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const today = new Date().getDay(); // 0=Sun
+  const peakColor = peak?.cls==='fp-critical'?'#8b0000':peak?.cls==='fp-above'?'#c4420a':peak?.cls==='fp-elevated'?'#b07a00':'#2d6a2d';
+  document.getElementById('forecast-content').innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><div style="font-size:20px;font-weight:500;color:${peakColor}">${peak?.label||'—'}</div><div style="font-size:11px;color:var(--muted)">peak over 7 days</div></div><div style="font-size:11px;color:var(--muted)">7-day average: ${forecast.avgScore}/100 · ${forecast.days.filter(Boolean).length}/7 days with data</div>`;
+  const today = new Date().getDay();
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
-  document.getElementById('forecast-days').innerHTML = forecast.days.map((day, i) => {
-    const label = days[(today + i) % 7];
-    const dayNum = `D${i+1}`;
+  document.getElementById('forecast-days').innerHTML = forecast.days.map((day,i) => {
+    const label = days[(today+i)%7];
     if (!day) return `<div class="forecast-day fp-none"><div class="forecast-day-label">${label}</div><div class="forecast-day-val">—</div></div>`;
     return `<div class="forecast-day ${day.cls}"><div class="forecast-day-label">${label}</div><div class="forecast-day-val">${day.label}</div></div>`;
   }).join('');
 }
 
 function getNIFCScore(forecast) {
-  if (!forecast?.dataAvailable) return { score: 20, label: 'NIFC forecast unavailable' };
+  if (!forecast?.dataAvailable) return { score:20, label:'NIFC forecast unavailable' };
   const peak = forecast.peakDay;
-  if (!peak) return { score: 20, label: 'No forecast data' };
-  return { score: forecast.peakScore, label: `${peak.label} fire potential (7-day peak, NIFC)` };
+  if (!peak) return { score:20, label:'No forecast data' };
+  return { score:forecast.peakScore, label:`${peak.label} fire potential (7-day peak, NIFC)` };
 }
 
-async function getVegScore(lat, lng) {
-  const loc = await reverseGeoState(lat, lng);
-  const state = typeof loc === 'string' ? loc : loc.state;
-  const hi = ['CA','OR','WA','NV','AZ','NM','CO','UT','ID','MT','WY'];
-  const med = ['TX','OK','KS','NE','SD','ND','MN','FL'];
-  if (hi.includes(state)) return { score: 80, label: `High-risk vegetation zone (${state})`, state, county: loc.county||'', city: loc.city||'' };
-  if (med.includes(state)) return { score: 50, label: `Moderate vegetation risk (${state})`, state, county: loc.county||'', city: loc.city||'' };
-  return { score: 20, label: `Lower vegetation risk (${state||'unknown'})`, state: state||'?', county: loc.county||'', city: loc.city||'' };
-}
-
+// ── Reverse geocode — FIXED: clean stateMap, no duplicate try/catch ──────────
 async function reverseGeoState(lat, lng) {
   try {
     const r = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${API_KEY}`);
@@ -1333,16 +901,10 @@ async function reverseGeoState(lat, lng) {
       if (state) return { state, county, city };
     }
   } catch(e) {}
-  // Fallback: Nominatim
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: {'User-Agent':'AMERIND-WildfireRisk/1.0'} });
     const d = await r.json();
-    return {
-// Fallback: Nominatim
-  try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: {'User-Agent':'AMERIND-WildfireRisk/1.0'} });
-    const d = await r.json();
-    const stateMap = {'Arizona':'AZ','California':'CA','Washington':'WA','Oregon':'OR','Montana':'MT','Nevada':'NV','Utah':'UT','Colorado':'CO','New Mexico':'NM','Idaho':'ID','Wyoming':'WY','Texas':'TX','Oklahoma':'OK','Minnesota':'MN','South Dakota':'SD','North Dakota':'ND','Florida':'FL','Alaska':'AK','Hawaii':'HI','Arkansas':'AR','Georgia':'GA','Iowa':'IA','Missouri':'MO','Wisconsin':'WI','Michigan':'MI','Indiana':'IN','Illinois':'IL','Ohio':'OH','Kentucky':'KY','Pennsylvania':'PA','New York':'NY','Maine':'ME','Massachusetts':'MA','Connecticut':'CT','New Jersey':'NJ','Maryland':'MD','Virginia':'VA','Tennessee':'TN','Louisiana':'LA','Mississippi':'MS','Alabama':'AL','North Carolina':'NC','South Carolina':'SC'};
+    const stateMap = {'Arizona':'AZ','California':'CA','Washington':'WA','Oregon':'OR','Montana':'MT','Nevada':'NV','Utah':'UT','Colorado':'CO','New Mexico':'NM','Idaho':'ID','Wyoming':'WY','Texas':'TX','Oklahoma':'OK','Minnesota':'MN','South Dakota':'SD','North Dakota':'ND','Florida':'FL','Alaska':'AK','Hawaii':'HI','Arkansas':'AR','Georgia':'GA','Iowa':'IA','Missouri':'MO','Wisconsin':'WI','Michigan':'MI','Indiana':'IN','Illinois':'IL','Ohio':'OH','Kentucky':'KY','Pennsylvania':'PA','New York':'NY','Maine':'ME','Massachusetts':'MA','Connecticut':'CT','New Jersey':'NJ','Maryland':'MD','Virginia':'VA','Tennessee':'TN','Louisiana':'LA','Mississippi':'MS','Alabama':'AL','North Carolina':'NC','South Carolina':'SC','Nebraska':'NE','Kansas':'KS','Wyoming':'WY'};
     const stateName = d.address?.state || '';
     return {
       state: stateMap[stateName] || d.address?.['ISO3166-2-lvl4']?.replace('US-','') || stateName.substring(0,2).toUpperCase() || '',
@@ -1351,53 +913,46 @@ async function reverseGeoState(lat, lng) {
     };
   } catch(e) {}
   return { state: '', county: '', city: '' };
-}const stateName = d.address?.state || '';
-return stateMap[stateName] || d.address?.['ISO3166-2-lvl4']?.replace('US-','') || stateName.substring(0,2).toUpperCase() || '';
-      county: d.address?.county?.replace(' County','') || '',
-      city: d.address?.city || d.address?.town || d.address?.village || '',
-    };
-  } catch(e) {}
-  return { state: '', county: '', city: '' };
+}
+
+async function getVegScore(lat, lng) {
+  const loc = await reverseGeoState(lat, lng);
+  const state = typeof loc === 'string' ? loc : loc.state;
+  const hi = ['CA','OR','WA','NV','AZ','NM','CO','UT','ID','MT','WY'];
+  const med = ['TX','OK','KS','NE','SD','ND','MN','FL'];
+  if (hi.includes(state)) return { score:80, label:`High-risk vegetation zone (${state})`, state, county:loc.county||'', city:loc.city||'' };
+  if (med.includes(state)) return { score:50, label:`Moderate vegetation risk (${state})`, state, county:loc.county||'', city:loc.city||'' };
+  return { score:20, label:`Lower vegetation risk (${state||'unknown'})`, state:state||'?', county:loc.county||'', city:loc.city||'' };
 }
 
 function getWUIScore(lat, lng) {
-  if (lng < -100) return { score: 72, label: 'High WUI density — western region' };
-  if (lng < -85) return { score: 45, label: 'Moderate WUI exposure' };
-  return { score: 22, label: 'Lower WUI exposure — eastern region' };
+  if (lng < -100) return { score:72, label:'High WUI density — western region' };
+  if (lng < -85)  return { score:45, label:'Moderate WUI exposure' };
+  return { score:22, label:'Lower WUI exposure — eastern region' };
 }
 
 function getFireScore(count) {
-  if (count >= 3) return { score: 90, label: `${count} active fire perimeters nearby` };
-  if (count === 2) return { score: 70, label: '2 active fire perimeters nearby' };
-  if (count === 1) return { score: 55, label: '1 active fire perimeter nearby' };
-  return { score: 12, label: 'No active perimeters in region' };
+  if (count >= 3) return { score:90, label:`${count} active fire perimeters nearby` };
+  if (count === 2) return { score:70, label:'2 active fire perimeters nearby' };
+  if (count === 1) return { score:55, label:'1 active fire perimeter nearby' };
+  return { score:12, label:'No active perimeters in region' };
 }
 
 function getInfraScore(iso) {
-  // Now uses ISO PPC estimate instead of heuristic
   const ppcMap = {'2–3':20,'4–5':45,'5–6':55,'8–9':80,'?':50};
-  const score = ppcMap[iso.ppc] || 50;
-  return { score, label: `ISO PPC est. ${iso.ppc} — ${iso.label}` };
+  return { score:ppcMap[iso.ppc]||50, label:`ISO PPC est. ${iso.ppc} — ${iso.label}` };
 }
 
 function compositeScore(f) {
-  // Weights: drought 25%, veg 18%, wui 18%, fire 18%, infra 9%, nifc 12%
-  return Math.round(
-    f.drought.score * 0.25 +
-    f.veg.score     * 0.18 +
-    f.wui.score     * 0.18 +
-    f.fire.score    * 0.18 +
-    f.infra.score   * 0.09 +
-    (f.nifc?.score || 20) * 0.12
-  );
+  return Math.round(f.drought.score*0.25 + f.veg.score*0.18 + f.wui.score*0.18 + f.fire.score*0.18 + f.infra.score*0.09 + (f.nifc?.score||20)*0.12);
 }
 
 function riskStyle(score) {
-  if (score >= 75) return { label: 'Critical', color: '#8b0000' };
-  if (score >= 55) return { label: 'High', color: '#c4420a' };
-  if (score >= 35) return { label: 'Moderate', color: '#b07a00' };
-  if (score >= 15) return { label: 'Low-moderate', color: '#5a7a3a' };
-  return { label: 'Low', color: '#2d6a2d' };
+  if (score >= 75) return { label:'Critical', color:'#8b0000' };
+  if (score >= 55) return { label:'High', color:'#c4420a' };
+  if (score >= 35) return { label:'Moderate', color:'#b07a00' };
+  if (score >= 15) return { label:'Low-moderate', color:'#5a7a3a' };
+  return { label:'Low', color:'#2d6a2d' };
 }
 
 function barColor(s) {
@@ -1410,9 +965,7 @@ function barColor(s) {
 function renderResults(score, factors, addr, wx) {
   const rs = riskStyle(score);
   currentResult = { score, factors, addr, rs, wx, timestamp: new Date() };
-
-  const banner = document.getElementById('risk-banner');
-  banner.classList.add('visible');
+  document.getElementById('risk-banner').classList.add('visible');
   document.getElementById('risk-score-num').textContent = score;
   document.getElementById('risk-score-num').style.color = rs.color;
   document.getElementById('risk-label-text').textContent = rs.label;
@@ -1421,34 +974,25 @@ function renderResults(score, factors, addr, wx) {
   document.getElementById('risk-meter-fill').style.width = score + '%';
   document.getElementById('risk-meter-fill').style.background = rs.color;
   document.getElementById('pdf-btn').disabled = false;
-
   document.getElementById('meta-row').innerHTML = `
     <div class="meta-item">Assessed: <span>${new Date().toLocaleString()}</span></div>
     <div class="meta-item">State: <span>${factors.veg.state||'—'}</span></div>
     <div class="meta-item">Drought: <span>${factors.drought.dm>=0?'D'+factors.drought.dm:'None'}</span></div>
-    ${wx ? `<div class="meta-item">Humidity: <span>${wx.humidity}%</span></div>` : ''}
-  `;
-
+    ${wx ? `<div class="meta-item">Humidity: <span>${wx.humidity}%</span></div>` : ''}`;
   const factorData = [
-    { name: 'Drought severity', weight: '25%', score: factors.drought.score, sub: factors.drought.label },
-    { name: 'Vegetation type', weight: '18%', score: factors.veg.score, sub: factors.veg.label },
-    { name: 'WUI proximity', weight: '18%', score: factors.wui.score, sub: factors.wui.label },
-    { name: 'Fire history', weight: '18%', score: factors.fire.score, sub: factors.fire.label },
-    { name: 'Response capacity (ISO)', weight: '9%', score: factors.infra.score, sub: factors.infra.label },
-    { name: 'NIFC 7-day fire potential', weight: '12%', score: factors.nifc?.score || 20, sub: factors.nifc?.label || 'NIFC forecast unavailable' },
+    { name:'Drought severity', weight:'25%', score:factors.drought.score, sub:factors.drought.label },
+    { name:'Vegetation type', weight:'18%', score:factors.veg.score, sub:factors.veg.label },
+    { name:'WUI proximity', weight:'18%', score:factors.wui.score, sub:factors.wui.label },
+    { name:'Fire history', weight:'18%', score:factors.fire.score, sub:factors.fire.label },
+    { name:'Response capacity (ISO)', weight:'9%', score:factors.infra.score, sub:factors.infra.label },
+    { name:'NIFC 7-day fire potential', weight:'12%', score:factors.nifc?.score||20, sub:factors.nifc?.label||'NIFC forecast unavailable' },
   ];
-
   document.getElementById('factor-list').innerHTML = factorData.map(f => `
     <div class="factor-row">
-      <div class="factor-header">
-        <div class="factor-name">${f.name} <span style="font-size:10px;color:var(--muted);font-weight:400">${f.weight}</span></div>
-        <div class="factor-score-num" style="color:${barColor(f.score)}">${f.score}</div>
-      </div>
+      <div class="factor-header"><div class="factor-name">${f.name} <span style="font-size:10px;color:var(--muted);font-weight:400">${f.weight}</span></div><div class="factor-score-num" style="color:${barColor(f.score)}">${f.score}</div></div>
       <div class="factor-sub">${f.sub}</div>
       <div class="factor-bar"><div class="factor-bar-fill" style="width:${f.score}%;background:${barColor(f.score)}"></div></div>
-    </div>
-  `).join('');
-
+    </div>`).join('');
   document.getElementById('factors-card').classList.add('visible');
 }
 
@@ -1472,79 +1016,34 @@ function clearResults() {
 async function runFromCoords(lat, lng) {
   document.getElementById('assess-btn').disabled = true;
   clearResults();
-  setStatus('Running assessment from pin location...', true);
-
+  setStatus('Running assessment...', true);
   try {
-    // Reverse geocode to get a readable label — try Nominatim first (more detail for tribal areas)
     let fmtAddr = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     try {
-      const nr = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16`, {
-        headers: { 'User-Agent': 'AMERIND-WildfireRisk/1.0' }
-      });
+      const nr = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16`, { headers: {'User-Agent':'AMERIND-WildfireRisk/1.0'} });
       const nd = await nr.json();
-      if (nd?.display_name) {
-        fmtAddr = nd.display_name;
-      }
-    } catch(e) {
-      // Keep coordinate label if reverse geocode fails
-    }
-
-    // Update address box so underwriter can see what was assessed
+      if (nd?.display_name) fmtAddr = nd.display_name;
+    } catch(e) {}
     document.getElementById('addr').value = fmtAddr;
-
     initMap(lat, lng);
     if (marker) map.removeLayer(marker);
-
-    // Use a distinct pin icon for dropped pins vs geocoded addresses
-    const pinIcon = L.divIcon({
-      className: '',
-      html: `<div style="width:16px;height:16px;background:#c4420a;border:3px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
-    });
-    marker = L.marker([lat, lng], { icon: pinIcon }).addTo(map)
-      .bindPopup(`<b>Dropped pin</b><br>${fmtAddr}`).openPopup();
-
+    const pinIcon = L.divIcon({ className:'', html:`<div style="width:16px;height:16px;background:#c4420a;border:3px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`, iconSize:[16,16], iconAnchor:[8,8] });
+    marker = L.marker([lat,lng], { icon:pinIcon }).addTo(map).bindPopup(`<b>Dropped pin</b><br>${fmtAddr}`).openPopup();
     setStatus('Loading all risk data...', true);
-
-    const [droughtFeatures, droughtCalc, fireCount, vegData, wxData, redFlag, nifc] = await Promise.all([
-      addDroughtLayer(lat, lng),
-      fetchDroughtIndex(lat, lng),
-      addFireLayer(lat, lng),
-      getVegScore(lat, lng),
-      fetchWeather(lat, lng),
-      fetchRedFlagWarnings(lat, lng),
-      fetchNIFC7Day(lat, lng),
-    ]);
-
-    const state = vegData.state;
-    const county = vegData.county || '';
-    const city = vegData.city || '';
-    const [isoData] = await Promise.all([ getISOClass(lat, lng, state) ]);
-
+    const [droughtFeatures, droughtCalc, fireCount, vegData, wxData, redFlag, nifc] = await Promise.all([addDroughtLayer(lat,lng), fetchDroughtIndex(lat,lng), addFireLayer(lat,lng), getVegScore(lat,lng), fetchWeather(lat,lng), fetchRedFlagWarnings(lat,lng), fetchNIFC7Day(lat,lng)]);
+    const state = vegData.state, county = vegData.county||'', city = vegData.city||'';
+    const [isoData] = await Promise.all([getISOClass(lat,lng,state)]);
     const wx = renderWeather(wxData);
     renderRedFlag(redFlag);
     renderISO(isoData);
     renderNIFCForecast(nifc);
     fetchAndRenderSocialFeeds(lat, lng, state, county, city);
-
-    const factors = {
-      drought: getDroughtScore(droughtFeatures, droughtCalc),
-      veg: vegData,
-      wui: getWUIScore(lat, lng),
-      fire: getFireScore(fireCount),
-      infra: getInfraScore(isoData),
-      nifc: getNIFCScore(nifc),
-    };
-
+    const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
     const score = compositeScore(factors);
     setStatus(`Assessment complete — pin at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
     renderResults(score, factors, `📍 ${fmtAddr}`, wx);
-
-  } catch(e) {
-    setStatus('Error: ' + e.message);
-    console.error(e);
-  }
+    updateLayerControl();
+  } catch(e) { setStatus('Error: ' + e.message); console.error(e); }
   document.getElementById('assess-btn').disabled = false;
 }
 
@@ -1554,95 +1053,39 @@ async function runSearch() {
   document.getElementById('assess-btn').disabled = true;
   clearResults();
   setStatus('Geocoding address...', true);
-
   try {
     let lat, lng, fmtAddr;
-
-    // Try Google Maps first
     try {
       const geo = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addr)}&key=${API_KEY}`);
       const gd = await geo.json();
-      if (gd.status === 'REQUEST_DENIED' || gd.status === 'INVALID_REQUEST') {
-        throw new Error(`Google Maps API: ${gd.status} — ${gd.error_message || 'check API key restrictions in Google Cloud Console'}`);
-      }
-      if (gd.results?.length) {
-        lat = gd.results[0].geometry.location.lat;
-        lng = gd.results[0].geometry.location.lng;
-        fmtAddr = gd.results[0].formatted_address;
-      }
+      if (gd.status === 'REQUEST_DENIED' || gd.status === 'INVALID_REQUEST') throw new Error(`Google Maps API: ${gd.status}`);
+      if (gd.results?.length) { lat = gd.results[0].geometry.location.lat; lng = gd.results[0].geometry.location.lng; fmtAddr = gd.results[0].formatted_address; }
     } catch(geoErr) {
-      console.warn('Google geocode failed, trying Nominatim fallback:', geoErr.message);
-      setStatus('Google Maps unavailable, trying OpenStreetMap geocoder...', true);
-      // Fallback: Nominatim (OpenStreetMap) — free, no key, CORS-enabled
-      const nomUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&countrycodes=us`;
-      const nr = await fetch(nomUrl, { headers: { 'Accept-Language': 'en', 'User-Agent': 'AMERIND-WildfireRisk/1.0' } });
+      setStatus('Google Maps unavailable, trying OpenStreetMap...', true);
+      const nr = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&countrycodes=us`, { headers: {'Accept-Language':'en','User-Agent':'AMERIND-WildfireRisk/1.0'} });
       const nd = await nr.json();
-      if (!nd?.length) {
-        setStatus(`Address not found — try the "Drop pin" button to place a pin directly on the map.`);
-        document.getElementById('assess-btn').disabled = false;
-        return;
-      }
-      lat = parseFloat(nd[0].lat);
-      lng = parseFloat(nd[0].lon);
-      fmtAddr = nd[0].display_name;
+      if (!nd?.length) { setStatus('Address not found — try the "Drop pin" button.'); document.getElementById('assess-btn').disabled = false; return; }
+      lat = parseFloat(nd[0].lat); lng = parseFloat(nd[0].lon); fmtAddr = nd[0].display_name;
     }
-
-    if (!lat || !lng) {
-      setStatus('Address not found. Try adding city and state.');
-      document.getElementById('assess-btn').disabled = false;
-      return;
-    }
-
+    if (!lat || !lng) { setStatus('Address not found. Try adding city and state.'); document.getElementById('assess-btn').disabled = false; return; }
     setStatus('Loading all risk data...', true);
     initMap(lat, lng);
     if (marker) map.removeLayer(marker);
     marker = L.marker([lat,lng]).addTo(map).bindPopup(`<b>${fmtAddr}</b>`).openPopup();
-
-    // Fetch everything in parallel — drought index always runs via Open-Meteo (guaranteed)
-    // ArcGIS map layer runs alongside but failure doesn't block scoring
-    const [droughtFeatures, droughtCalc, fireCount, vegData, wxData, redFlag, nifc] = await Promise.all([
-      addDroughtLayer(lat, lng),
-      fetchDroughtIndex(lat, lng),
-      addFireLayer(lat, lng),
-      getVegScore(lat, lng),
-      fetchWeather(lat, lng),
-      fetchRedFlagWarnings(lat, lng),
-      fetchNIFC7Day(lat, lng),
-    ]);
-
-    const state = vegData.state;
-    const county = vegData.county || '';
-    const city = vegData.city || '';
-    const [isoData] = await Promise.all([
-      getISOClass(lat, lng, state),
-    ]);
-
+    const [droughtFeatures, droughtCalc, fireCount, vegData, wxData, redFlag, nifc] = await Promise.all([addDroughtLayer(lat,lng), fetchDroughtIndex(lat,lng), addFireLayer(lat,lng), getVegScore(lat,lng), fetchWeather(lat,lng), fetchRedFlagWarnings(lat,lng), fetchNIFC7Day(lat,lng)]);
+    const state = vegData.state, county = vegData.county||'', city = vegData.city||'';
+    const [isoData] = await Promise.all([getISOClass(lat,lng,state)]);
     const wx = renderWeather(wxData);
     renderRedFlag(redFlag);
     renderISO(isoData);
     renderNIFCForecast(nifc);
-
-    // Fire off social feeds async (non-blocking)
     fetchAndRenderSocialFeeds(lat, lng, state, county, city);
-
-    const factors = {
-      drought: getDroughtScore(droughtFeatures, droughtCalc),
-      veg: vegData,
-      wui: getWUIScore(lat, lng),
-      fire: getFireScore(fireCount),
-      infra: getInfraScore(isoData),
-      nifc: getNIFCScore(nifc),
-    };
-
+    const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
     const score = compositeScore(factors);
     setStatus(`Assessment complete — ${fmtAddr}`);
     renderResults(score, factors, fmtAddr, wx);
     updateLayerControl();
-
-  } catch(e) {
-    setStatus('Error: ' + e.message);
-    console.error(e);
-  }
+  } catch(e) { setStatus('Error: ' + e.message); console.error(e); }
   document.getElementById('assess-btn').disabled = false;
 }
 
@@ -1653,147 +1096,76 @@ function exportPDF() {
   const doc = new jsPDF({ unit:'pt', format:'letter' });
   const { score, factors, addr, rs, wx, timestamp } = currentResult;
   const W = 612, M = 48, CW = W - M*2;
-
-  // ── Header ──
   doc.setFillColor(26,24,20); doc.rect(0,0,W,60,'F');
   doc.setFillColor(196,66,10); doc.rect(0,0,5,60,'F');
   doc.setTextColor(255,255,255);
-  doc.setFontSize(16); doc.setFont('helvetica','bold');
-  doc.text('AMERIND Risk', M, 26);
-  doc.setFontSize(10); doc.setFont('helvetica','normal');
-  doc.text('Wildfire Risk Assessment Report', M, 42);
-  doc.setTextColor(160,150,140); doc.setFontSize(9);
-  doc.text(timestamp.toLocaleString(), W-M, 38, {align:'right'});
-
-  // ── Risk score block ──
+  doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.text('AMERIND Risk', M, 26);
+  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.text('Wildfire Risk Assessment Report', M, 42);
+  doc.setTextColor(160,150,140); doc.setFontSize(9); doc.text(timestamp.toLocaleString(), W-M, 38, {align:'right'});
   const riskColors = {'Critical':[139,0,0],'High':[196,66,10],'Moderate':[176,122,0],'Low-moderate':[90,122,58],'Low':[45,106,45]};
   const rc = riskColors[rs.label] || [100,100,100];
   let y = 74;
-  doc.setFillColor(...rc);
-  doc.roundedRect(M, y, CW, 68, 6, 6, 'F');
+  doc.setFillColor(...rc); doc.roundedRect(M,y,CW,68,6,6,'F');
   doc.setTextColor(255,255,255);
-  doc.setFontSize(46); doc.setFont('helvetica','bold');
-  doc.text(String(score), M+18, y+50);
-  doc.setFontSize(22); doc.setFont('helvetica','normal');
-  doc.text(rs.label + ' Wildfire Risk', M+90, y+30);
-  doc.setFontSize(10);
-  const addrLines = doc.splitTextToSize(addr, CW-110);
-  doc.text(addrLines, M+90, y+46);
-
-  // ── Score bar ──
+  doc.setFontSize(46); doc.setFont('helvetica','bold'); doc.text(String(score), M+18, y+50);
+  doc.setFontSize(22); doc.setFont('helvetica','normal'); doc.text(rs.label + ' Wildfire Risk', M+90, y+30);
+  doc.setFontSize(10); doc.text(doc.splitTextToSize(addr, CW-110), M+90, y+46);
   y += 76;
-  doc.setFillColor(220,215,208); doc.roundedRect(M, y, CW, 7, 3, 3, 'F');
-  doc.setFillColor(...rc); doc.roundedRect(M, y, Math.round(CW*score/100), 7, 3, 3, 'F');
-
-  // ── Weather row ──
+  doc.setFillColor(220,215,208); doc.roundedRect(M,y,CW,7,3,3,'F');
+  doc.setFillColor(...rc); doc.roundedRect(M,y,Math.round(CW*score/100),7,3,3,'F');
   y += 16;
   if (wx) {
-    doc.setFillColor(245,243,238); doc.roundedRect(M, y, CW, 32, 4, 4, 'F');
-    doc.setTextColor(80,75,70); doc.setFontSize(8); doc.setFont('helvetica','bold');
-    doc.text('CURRENT CONDITIONS', M+10, y+11);
+    doc.setFillColor(245,243,238); doc.roundedRect(M,y,CW,32,4,4,'F');
+    doc.setTextColor(80,75,70); doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.text('CURRENT CONDITIONS', M+10, y+11);
     doc.setFont('helvetica','normal'); doc.setTextColor(26,24,20); doc.setFontSize(10);
-    const wxItems = [`${wx.temp}°F`, `${wx.humidity}% RH`, `${wx.wind} mph wind`, `${wx.gust} mph gusts`];
-    const wxLabels = ['Temperature','Humidity','Wind','Gusts'];
-    const colW = CW / 4;
-    wxItems.forEach((val, i) => {
-      const x = M + i*colW + colW/2;
+    [`${wx.temp}°F`,`${wx.humidity}% RH`,`${wx.wind} mph wind`,`${wx.gust} mph gusts`].forEach((val,i) => {
       doc.setFont('helvetica','bold'); doc.setFontSize(11);
-      doc.text(val, x, y+24, {align:'center'});
+      doc.text(val, M + i*(CW/4) + CW/8, y+24, {align:'center'});
     });
     y += 42;
   }
-
-  // ── Section: Factor breakdown ──
   y += 10;
-  doc.setTextColor(100,96,92); doc.setFontSize(8); doc.setFont('helvetica','bold');
-  doc.text('FACTOR BREAKDOWN', M, y+1);
-  doc.setDrawColor(210,205,198); doc.setLineWidth(0.5);
-  doc.line(M, y+5, W-M, y+5);
+  doc.setTextColor(100,96,92); doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.text('FACTOR BREAKDOWN', M, y+1);
+  doc.setDrawColor(210,205,198); doc.setLineWidth(0.5); doc.line(M,y+5,W-M,y+5);
   y += 16;
-
-  const factorData = [
-    {name:'Drought Severity',    weight:'25%', score:factors.drought.score, sub:factors.drought.label},
-    {name:'Vegetation Type',     weight:'18%', score:factors.veg.score,     sub:factors.veg.label},
-    {name:'WUI Proximity',       weight:'18%', score:factors.wui.score,     sub:factors.wui.label},
-    {name:'Fire History',        weight:'18%', score:factors.fire.score,    sub:factors.fire.label},
-    {name:'Response Cap. (ISO)', weight:'9%',  score:factors.infra.score,   sub:factors.infra.label},
-    {name:'NIFC 7-Day Forecast', weight:'12%', score:factors.nifc?.score||20, sub:factors.nifc?.label||'NIFC data unavailable'},
-  ];
-
-  function fBarColor(s) {
-    if (s>=75) return [196,66,10];
-    if (s>=50) return [224,123,0];
-    if (s>=25) return [212,160,23];
-    return [74,143,74];
-  }
-
+  const factorData = [{name:'Drought Severity',weight:'25%',score:factors.drought.score,sub:factors.drought.label},{name:'Vegetation Type',weight:'18%',score:factors.veg.score,sub:factors.veg.label},{name:'WUI Proximity',weight:'18%',score:factors.wui.score,sub:factors.wui.label},{name:'Fire History',weight:'18%',score:factors.fire.score,sub:factors.fire.label},{name:'Response Cap. (ISO)',weight:'9%',score:factors.infra.score,sub:factors.infra.label},{name:'NIFC 7-Day Forecast',weight:'12%',score:factors.nifc?.score||20,sub:factors.nifc?.label||'NIFC data unavailable'}];
+  function fBarColor(s) { if(s>=75)return[196,66,10];if(s>=50)return[224,123,0];if(s>=25)return[212,160,23];return[74,143,74]; }
   const ROW = 46;
   factorData.forEach(f => {
-    // Row background
-    doc.setFillColor(248,246,242);
-    doc.roundedRect(M, y, CW, ROW, 4, 4, 'F');
-
-    // Score badge (right side)
+    doc.setFillColor(248,246,242); doc.roundedRect(M,y,CW,ROW,4,4,'F');
     const bc = fBarColor(f.score);
-    doc.setFillColor(bc[0], bc[1], bc[2]);
-    doc.roundedRect(W-M-36, y+8, 30, 20, 4, 4, 'F');
-    doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.text(String(f.score), W-M-21, y+22, {align:'center'});
-
-    // Factor name + weight
-    doc.setTextColor(26,24,20); doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.text(f.name, M+10, y+16);
-    doc.setTextColor(140,135,128); doc.setFontSize(8); doc.setFont('helvetica','normal');
-    doc.text(f.weight, M+10, y+27);
-
-    // Sub-label (truncated to fit)
-    const subText = doc.splitTextToSize(f.sub, CW-60)[0];
-    doc.setTextColor(120,115,108); doc.setFontSize(8);
-    doc.text(subText, M+10, y+37);
-
-    // Progress bar
-    doc.setFillColor(220,215,208);
-    doc.roundedRect(M+10, y+ROW-8, CW-56, 4, 2, 2, 'F');
-    doc.setFillColor(...bc);
-    doc.roundedRect(M+10, y+ROW-8, Math.round((CW-56)*f.score/100), 4, 2, 2, 'F');
-
+    doc.setFillColor(bc[0],bc[1],bc[2]); doc.roundedRect(W-M-36,y+8,30,20,4,4,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.text(String(f.score), W-M-21, y+22, {align:'center'});
+    doc.setTextColor(26,24,20); doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.text(f.name, M+10, y+16);
+    doc.setTextColor(140,135,128); doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.text(f.weight, M+10, y+27);
+    doc.setTextColor(120,115,108); doc.setFontSize(8); doc.text(doc.splitTextToSize(f.sub, CW-60)[0], M+10, y+37);
+    doc.setFillColor(220,215,208); doc.roundedRect(M+10,y+ROW-8,CW-56,4,2,2,'F');
+    doc.setFillColor(...bc); doc.roundedRect(M+10,y+ROW-8,Math.round((CW-56)*f.score/100),4,2,2,'F');
     y += ROW + 6;
   });
-
-  // ── Methodology ──
   y += 6;
-  doc.setTextColor(100,96,92); doc.setFontSize(8); doc.setFont('helvetica','bold');
-  doc.text('METHODOLOGY', M, y);
-  doc.setDrawColor(210,205,198); doc.line(M, y+4, W-M, y+4);
+  doc.setTextColor(100,96,92); doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.text('METHODOLOGY', M, y);
+  doc.setDrawColor(210,205,198); doc.line(M,y+4,W-M,y+4);
   y += 14;
   doc.setFont('helvetica','normal'); doc.setTextColor(120,115,108); doc.setFontSize(8);
-  const note = 'Composite score: drought 30%, vegetation 20%, WUI proximity 20%, fire history 20%, response capacity/ISO 10%. Sources: NDMC Drought Monitor (weekly), WFIGS fire perimeters (YTD), NOAA NWS red flag warnings, Open-Meteo live weather, ISO PPC estimate. Verify ISO PPC directly for binding underwriting decisions.';
+  const note = 'Composite score: drought 25%, vegetation 18%, WUI proximity 18%, fire history 18%, response capacity/ISO 9%, NIFC 7-day 12%. Sources: NDMC Drought Monitor, WFIGS fire perimeters, NOAA NWS, Open-Meteo, NASA FIRMS, NIFC, ISO PPC estimate.';
   const noteLines = doc.splitTextToSize(note, CW);
   doc.text(noteLines, M, y);
-  y += noteLines.length * 11 + 10;
-
-  // ── Disclaimer box ──
-  doc.setFillColor(245,243,238);
-  doc.roundedRect(M, y, CW, 30, 4, 4, 'F');
+  y += noteLines.length*11+10;
+  doc.setFillColor(245,243,238); doc.roundedRect(M,y,CW,30,4,4,'F');
   doc.setFontSize(8); doc.setTextColor(140,130,120);
   doc.text('FOR UNDERWRITING USE ONLY — Based on publicly available data. Not a substitute for on-site inspection', M+10, y+12);
   doc.text('or certified fire risk evaluation. Local conditions may vary significantly.', M+10, y+22);
-
-  // ── Footer ──
   doc.setFillColor(26,24,20); doc.rect(0,748,W,44,'F');
   doc.setTextColor(160,150,140); doc.setFontSize(8); doc.setFont('helvetica','normal');
   doc.text('AMERIND Risk — Tribally Owned and Operated Insurance', M, 768);
   doc.text(`Generated ${timestamp.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`, W-M, 768, {align:'right'});
-
-  const safeName = addr.replace(/[^a-z0-9]/gi,'_').substring(0,40);
-  doc.save(`AMERIND_Wildfire_Risk_${safeName}.pdf`);
+  doc.save(`AMERIND_Wildfire_Risk_${addr.replace(/[^a-z0-9]/gi,'_').substring(0,40)}.pdf`);
 }
 
 window.addEventListener('load', () => {
   initMap(38.5, -96);
-
-  // Auto-run assessment if URL contains coordinates from monitor alert
-  // Format: index.html#lat,lng or index.html#lat,lng,Fire Name
+  // Auto-run from monitor alert hash: index.html#lat,lng,label
   const hash = window.location.hash.replace('#','');
   if (hash) {
     const parts = hash.split(',');
@@ -1801,9 +1173,7 @@ window.addEventListener('load', () => {
     const lng = parseFloat(parts[1]);
     const label = parts.slice(2).join(',').replace(/%20/g,' ') || null;
     if (!isNaN(lat) && !isNaN(lng)) {
-      // Pre-fill address if label provided
       if (label) document.getElementById('addr').value = decodeURIComponent(label);
-      // Short delay to let map initialize
       setTimeout(() => runFromCoords(lat, lng), 500);
     }
   }
