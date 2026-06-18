@@ -570,19 +570,70 @@ async function addFireLayer(lat, lng) {
 
 
 // ── Portfolio property overlay — shows insured properties near assessed location ──
+// ── Portfolio property layer — static, loads all properties on map open ───────
+// Refreshes automatically every 5 minutes and after any upload
+let portfolioRefreshInterval = null;
+
+async function loadPortfolioLayer() {
+  if (portfolioLayer) { try { map.removeLayer(portfolioLayer); } catch(e) {} portfolioLayer = null; }
+  try {
+    console.log('Loading portfolio layer...');
+    // Load ALL properties with lat/lng — no radius filter, full portfolio visible at all times
+    const res = await fetch(
+      `${SUPA_URL}/rest/v1/portfolio?select=address,city,state,lat,lng,tiv,tribe,last_risk_score,policy_number&limit=5000&order=last_risk_score.desc.nullslast`,
+      { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
+    );
+    if (!res.ok) { console.warn('Portfolio fetch failed:', res.status); return; }
+    const props = await res.json();
+    if (!Array.isArray(props)) { console.warn('Portfolio not array:', props); return; }
+    console.log(`Portfolio: ${props.length} total, ${props.filter(p=>p.lat&&p.lng).length} with coords`);
+
+    portfolioLayer = L.layerGroup();
+
+    props.forEach(p => {
+      if (!p.lat || !p.lng) return;
+      const score = p.last_risk_score || 0;
+      const color = score >= 75 ? '#8b0000' : score >= 55 ? '#c4420a' : score >= 35 ? '#b07a00' : '#2d6a2d';
+      const size = score >= 75 ? 11 : score >= 55 ? 9 : 7;
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid rgba(255,255,255,0.9);border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.5)"></div>`,
+        iconSize: [size, size], iconAnchor: [size/2, size/2],
+      });
+      const tiv = p.tiv ? '$' + Math.round(p.tiv/1000).toLocaleString() + 'K' : '—';
+      const addr = [p.address, p.city, p.state].filter(Boolean).join(', ');
+      L.marker([p.lat, p.lng], { icon, zIndexOffset: 500 })
+        .bindPopup(`<div style="font-size:12px;min-width:200px">
+          <div style="font-weight:600;margin-bottom:4px;font-size:13px">${addr || 'Unknown address'}</div>
+          <div style="color:#888;margin-bottom:8px;font-size:11px">${p.tribe || '—'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div><div style="font-size:10px;color:#888">TIV</div><div style="font-weight:500">${tiv}</div></div>
+            <div><div style="font-size:10px;color:#888">Risk</div><div style="font-weight:500;color:${color}">${score || '—'}</div></div>
+            ${p.policy_number ? `<div><div style="font-size:10px;color:#888">Policy</div><div style="font-weight:500;font-size:10px">${p.policy_number}</div></div>` : ''}
+          </div>
+        </div>`)
+        .addTo(portfolioLayer);
+    });
+
+    portfolioLayer.addTo(map);
+    updateLayerControl();
+    console.log(`Portfolio layer: ${props.length} properties loaded`);
+
+  } catch(e) { console.warn('Portfolio layer failed:', e.message); }
+}
+
+// Keep local radius overlay for post-assessment TIV summary
 async function addPortfolioOverlay(lat, lng, radiusMiles = 50) {
-  if (portfolioLayer) { try { map.removeLayer(portfolioLayer); } catch(e) {} }
+  // Portfolio is already shown globally — just update status with local exposure summary
   try {
     const degRadius = radiusMiles / 69;
     const res = await fetch(
-      `${SUPA_URL}/rest/v1/portfolio?select=address,city,state,lat,lng,tiv,tribe,last_risk_score,policy_number` +
-      `&lat=gte.${lat - degRadius}&lat=lte.${lat + degRadius}` +
-      `&lng=gte.${lng - degRadius}&lng=lte.${lng + degRadius}&limit=500`,
+      `${SUPA_URL}/rest/v1/portfolio?select=lat,lng,tiv,last_risk_score&lat=gte.${lat-degRadius}&lat=lte.${lat+degRadius}&lng=gte.${lng-degRadius}&lng=lte.${lng+degRadius}&limit=500`,
       { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
     );
     if (!res.ok) return;
     const props = await res.json();
-    if (!Array.isArray(props) || !props.length) return;
+    if (!Array.isArray(props)) return;
     const inRadius = props.filter(p => {
       if (!p.lat || !p.lng) return false;
       const dlat = (p.lat - lat) * Math.PI / 180;
@@ -591,28 +642,10 @@ async function addPortfolioOverlay(lat, lng, radiusMiles = 50) {
       return 3959 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= radiusMiles;
     });
     if (!inRadius.length) return;
-    portfolioLayer = L.layerGroup();
-    inRadius.forEach(p => {
-      const score = p.last_risk_score || 0;
-      const color = score >= 75 ? '#8b0000' : score >= 55 ? '#c4420a' : score >= 35 ? '#b07a00' : '#2d6a2d';
-      const size = score >= 55 ? 10 : 7;
-      const icon = L.divIcon({
-        className: '',
-        html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
-        iconSize: [size, size], iconAnchor: [size/2, size/2],
-      });
-      const tiv = p.tiv ? '$' + Math.round(p.tiv/1000).toLocaleString() + 'K' : '—';
-      const addr = [p.address, p.city, p.state].filter(Boolean).join(', ');
-      L.marker([p.lat, p.lng], { icon, zIndexOffset: 500 })
-        .bindPopup(`<div style="font-size:12px;min-width:180px"><div style="font-weight:600;margin-bottom:4px">${addr || 'Unknown address'}</div><div style="color:#666;margin-bottom:6px">${p.tribe || '—'}</div><div style="display:flex;gap:12px"><div><div style="font-size:10px;color:#888">TIV</div><div style="font-weight:500">${tiv}</div></div><div><div style="font-size:10px;color:#888">Risk</div><div style="font-weight:500;color:${color}">${score||'—'}</div></div>${p.policy_number ? `<div><div style="font-size:10px;color:#888">Policy</div><div style="font-weight:500">${p.policy_number}</div></div>` : ''}</div></div>`)
-        .addTo(portfolioLayer);
-    });
-    portfolioLayer.addTo(map);
-    updateLayerControl();
     const highRisk = inRadius.filter(p => (p.last_risk_score||0) >= 55).length;
     const totalTIV = inRadius.reduce((s,p) => s+(p.tiv||0), 0);
-    setStatus(`Assessment complete — ${inRadius.length} insured properties within ${radiusMiles}mi${highRisk ? `, ${highRisk} high-risk` : ''}${totalTIV ? `, $${Math.round(totalTIV/1000000*10)/10}M TIV` : ''}`);
-  } catch(e) { console.warn('Portfolio overlay failed:', e.message); }
+    setStatus(`${inRadius.length} insured properties within ${radiusMiles}mi${highRisk ? ` · ${highRisk} high-risk` : ''}${totalTIV ? ` · $${Math.round(totalTIV/1000000*10)/10}M TIV exposed` : ''}`);
+  } catch(e) {}
 }
 
 // ── Threat buffer rings ───────────────────────────────────────────────────────
@@ -1503,7 +1536,7 @@ function clearResults() {
   if (smokeLayer) { try { map.removeLayer(smokeLayer); } catch(e) {} smokeLayer = null; }
   document.getElementById('smoke-card').style.display = 'none';
   document.getElementById('fire-stats-card').style.display = 'none';
-  if (portfolioLayer) { try { map.removeLayer(portfolioLayer); } catch(e) {} portfolioLayer = null; }
+  // Portfolio layer stays persistent — don't remove it on clear
   if (threatLayer) { try { map.removeLayer(threatLayer); } catch(e) {} threatLayer = null; }
   setStatus('Enter a property address to generate a wildfire risk assessment.');
   currentResult = null;
@@ -1703,8 +1736,12 @@ window.addEventListener('load', () => {
   // Center on AMERIND portfolio footprint — western/central US
   initMap(44, -108, 4);
 
-  // Load national fire perimeters — tile layer, CORS-free, instant
+  // Load all three static layers on startup
   setTimeout(() => loadNationalFirePerimeters(), 1200);
+  setTimeout(() => loadPortfolioLayer(), 2000);
+
+  // Auto-refresh portfolio dots every 5 minutes to catch new uploads/deletions
+  portfolioRefreshInterval = setInterval(() => loadPortfolioLayer(), 5 * 60 * 1000);
 
   // Auto-run from monitor alert hash: index.html#lat,lng,label
   const hash = window.location.hash.replace('#','');
