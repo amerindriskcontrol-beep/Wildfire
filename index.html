@@ -562,10 +562,31 @@ async function addFireLayer(lat, lng) {
           l.bindPopup(`<b>🔥 ${fname}</b><br>${acres} acres`);
         }
       }).addTo(map);
-      return data.features.length;
+
+      // Find largest fire and calculate its centroid for threat ring placement
+      const largest = data.features.reduce((a, b) =>
+        (b.properties.poly_GISAcres||0) > (a.properties.poly_GISAcres||0) ? b : a
+      );
+
+      // Calculate centroid from bounding box of largest fire geometry
+      if (largest?.geometry) {
+        const coords = largest.geometry.type === 'Polygon'
+          ? largest.geometry.coordinates[0]
+          : largest.geometry.coordinates.flat(2);
+        if (coords?.length) {
+          const lats = coords.map(c => c[1]);
+          const lngs = coords.map(c => c[0]);
+          const fireLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+          const fireLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+          return { count: data.features.length, fireLat, fireLng,
+                   fireName: largest.properties.poly_IncidentName || 'Unknown Fire',
+                   fireAcres: largest.properties.poly_GISAcres };
+        }
+      }
+      return { count: data.features.length, fireLat: null, fireLng: null };
     }
   } catch(e) { console.error('Fire error',e); }
-  return 0;
+  return { count: 0, fireLat: null, fireLng: null };
 }
 
 
@@ -649,15 +670,29 @@ async function addPortfolioOverlay(lat, lng, radiusMiles = 50) {
 }
 
 // ── Threat buffer rings ───────────────────────────────────────────────────────
-function addThreatBuffers(lat, lng) {
+function addThreatBuffers(lat, lng, fireName) {
   if (threatLayer) { try { map.removeLayer(threatLayer); } catch(e) {} }
   threatLayer = L.layerGroup();
-  L.circle([lat, lng], { radius: 10*1609.34, color:'#8b0000', fillColor:'#8b0000', fillOpacity:0.04, weight:1.5, dashArray:'6 4' })
-    .bindPopup('<b>10-mile critical zone</b><br>Immediate threat radius.').addTo(threatLayer);
+  const label = fireName ? `<b>🔥 ${fireName}</b><br>` : '';
+
+  // Fire centroid marker
+  if (fireName) {
+    const fireIcon = L.divIcon({
+      className: '',
+      html: `<div style="font-size:22px;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5))">🔥</div>`,
+      iconSize: [24,24], iconAnchor: [12,12],
+    });
+    L.marker([lat, lng], { icon: fireIcon, zIndexOffset: 2000 })
+      .bindPopup(`<b>🔥 ${fireName}</b><br>Fire centroid — threat rings centered here`)
+      .addTo(threatLayer);
+  }
+
+  L.circle([lat, lng], { radius: 10*1609.34, color:'#8b0000', fillColor:'#8b0000', fillOpacity:0.05, weight:1.5, dashArray:'6 4' })
+    .bindPopup(`${label}<b>10-mile critical zone</b><br>Properties within this radius face immediate threat.`).addTo(threatLayer);
   L.circle([lat, lng], { radius: 25*1609.34, color:'#c4420a', fillColor:'#c4420a', fillOpacity:0.02, weight:1, dashArray:'4 6' })
-    .bindPopup('<b>25-mile monitoring zone</b><br>Elevated exposure radius.').addTo(threatLayer);
+    .bindPopup(`${label}<b>25-mile monitoring zone</b><br>Elevated exposure — monitor closely.`).addTo(threatLayer);
   L.circle([lat, lng], { radius: 50*1609.34, color:'#b07a00', fillColor:'transparent', fillOpacity:0, weight:0.75, dashArray:'2 8' })
-    .bindPopup('<b>50-mile portfolio scan radius</b>').addTo(threatLayer);
+    .bindPopup(`${label}<b>50-mile portfolio scan radius</b><br>All insured properties shown within this range.`).addTo(threatLayer);
   threatLayer.addTo(map);
   updateLayerControl();
 }
@@ -1451,7 +1486,8 @@ function getWUIScore(lat, lng) {
   return { score:20, label:'Eastern terrain — elevation scoring unavailable' };
 }
 
-function getFireScore(count) {
+function getFireScore(fireResult) {
+  const count = typeof fireResult === 'object' ? fireResult.count : fireResult;
   if (count >= 3) return { score:90, label:`${count} active fire perimeters nearby` };
   if (count === 2) return { score:70, label:'2 active fire perimeters nearby' };
   if (count === 1) return { score:55, label:'1 active fire perimeter nearby' };
@@ -1576,7 +1612,9 @@ async function runFromCoords(lat, lng) {
     const score = compositeScore(factors);
     renderResults(score, factors, `📍 ${fmtAddr}`, wx);
     updateLayerControl();
-    addThreatBuffers(lat, lng);
+    // Snap threat rings to fire centroid if a nearby fire was found
+    const threatCenter = fireCount?.fireLat ? { lat: fireCount.fireLat, lng: fireCount.fireLng } : { lat, lng };
+    addThreatBuffers(threatCenter.lat, threatCenter.lng, fireCount?.fireName);
     addPortfolioOverlay(lat, lng);
   } catch(e) { setStatus('Error: ' + e.message); console.error(e); }
   document.getElementById('assess-btn').disabled = false;
@@ -1623,7 +1661,9 @@ async function runSearch() {
     const score = compositeScore(factors);
     renderResults(score, factors, fmtAddr, wx);
     updateLayerControl();
-    addThreatBuffers(lat, lng);
+    // Snap threat rings to fire centroid if a nearby fire was found
+    const threatCenter = fireCount?.fireLat ? { lat: fireCount.fireLat, lng: fireCount.fireLng } : { lat, lng };
+    addThreatBuffers(threatCenter.lat, threatCenter.lng, fireCount?.fireName);
     addPortfolioOverlay(lat, lng);
   } catch(e) { setStatus('Error: ' + e.message); console.error(e); }
   document.getElementById('assess-btn').disabled = false;
