@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <!-- Google Maps + Places Autocomplete -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDomOvPPEUknUqFW-QFo3Eh6OD-g3lorVs&libraries=places&callback=initAutocomplete" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDomOvPPEUknUqFW-QFo3Eh6OD-g3lorVs&libraries=places,maps&v=beta&callback=initAutocomplete" async defer></script>
 <style>
 :root {
   --bg: #f7f5f0; --surface: #ffffff; --border: #e2ddd6;
@@ -235,6 +235,13 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
         <div style="font-size:10px;color:var(--muted);margin-top:8px">Source: NIFC National Predictive Services — updated daily</div>
       </div>
 
+      <!-- Smoke / AQI exposure -->
+      <div class="card" id="smoke-card" style="display:none">
+        <div class="card-title">Wildfire smoke exposure (PM2.5)</div>
+        <div id="smoke-content"></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:8px">Source: EPA AirNow — updated hourly</div>
+      </div>
+
       <div class="card factors-card" id="factors-card">
         <div class="card-title">Factor breakdown</div>
         <div id="factor-list"></div>
@@ -313,9 +320,10 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
       <div class="source-item"><div class="source-name">NASA FIRMS hotspots</div><div class="source-org">NASA EOSDIS / GIBS</div><div class="source-url"><a href="https://firms.modaps.eosdis.nasa.gov" target="_blank">firms.modaps.eosdis.nasa.gov</a></div><div class="source-desc">VIIRS 375m thermal anomaly detections from NOAA-20 and Suomi NPP satellites. Updated every ~12 hours.</div></div>
       <div class="source-item"><div class="source-name">NIFC 7-Day Fire Potential</div><div class="source-org">National Interagency Coordination Center</div><div class="source-url"><a href="https://fsapps.nwcg.gov/psp/npsg/forecast/" target="_blank">fsapps.nwcg.gov</a></div><div class="source-desc">Daily 7-day significant fire potential forecast. Normal / Elevated / Above Normal / Critical.</div></div>
       <div class="source-item"><div class="source-name">ISO fire protection class</div><div class="source-org">ISO / Verisk (estimated)</div><div class="source-url"><a href="https://www.isomitigation.com" target="_blank">isomitigation.com</a></div><div class="source-desc">Estimated PPC based on urbanization and state. Verify with ISO directly for binding decisions.</div></div>
-      <div class="source-item"><div class="source-name">Vegetation &amp; WUI zones</div><div class="source-org">USFS / LANDFIRE (regional heuristic)</div><div class="source-url"><a href="https://www.landfire.gov" target="_blank">landfire.gov</a></div><div class="source-desc">State-level vegetation risk and WUI density classification.</div></div>
+      <div class="source-item"><div class="source-name">Terrain &amp; elevation</div><div class="source-org">Google Maps Elevation API</div><div class="source-url"><a href="https://developers.google.com/maps/documentation/elevation" target="_blank">developers.google.com/maps</a></div><div class="source-desc">5-point upwind elevation sample per assessment. Slope calculated per Rothermel fire spread model — upslope terrain increases fire rate of spread up to 4x.</div></div>
     </div>
-  </div>
+    <div class="source-item"><div class="source-name">Wildfire smoke (PM2.5)</div><div class="source-org">EPA AirNow / USFS</div><div class="source-url"><a href="https://fire.airnow.gov" target="_blank">fire.airnow.gov</a></div><div class="source-desc">Hourly PM2.5 air quality index from monitoring stations and PurpleAir sensors. Smoke damage exposure indicator for insured properties.</div></div>
+    </div>
   <div class="footer-bottom">
     AMERIND Risk &mdash; Wildfire Risk Assessment Tool &mdash; For underwriting use only. Not a substitute for on-site inspection or certified fire risk evaluation.
   </div>
@@ -325,7 +333,7 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const API_KEY = "AIzaSyDomOvPPEUknUqFW-QFo3Eh6OD-g3lorVs";
-let map, marker, droughtLayer, fireLayer, redFlagLayer, firmsLayer, windLayer, portfolioLayer, threatLayer, currentResult = null;
+let map, marker, droughtLayer, fireLayer, redFlagLayer, firmsLayer, windLayer, portfolioLayer, threatLayer, smokeLayer, currentResult = null;
 
 // ── Supabase config for portfolio overlay ─────────────────────────────────────
 const SUPA_URL = 'https://cwnshkewhrummwpnfwlh.supabase.co';
@@ -333,24 +341,51 @@ const SUPA_KEY = 'sb_publishable__A6TaNRi-IUANSefmaNAnA_sEGGhqAQ';
 
 document.getElementById('hdr-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
 
-// ── Google Places Autocomplete ─────────────────────────────────────────────
+// ── Google Places Autocomplete (new PlaceAutocompleteElement API) ────────────
 function initAutocomplete() {
-  const input = document.getElementById('addr');
-  const autocomplete = new google.maps.places.Autocomplete(input, {
-    componentRestrictions: { country: 'us' },
-    fields: ['formatted_address','geometry'],
-  });
-  autocomplete.addListener('place_changed', () => {
-    const place = autocomplete.getPlace();
-    if (place.geometry?.location) {
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-      document.getElementById('addr').value = place.formatted_address;
-      runFromCoords(lat, lng);
+  try {
+    const input = document.getElementById('addr');
+
+    // Use new PlaceAutocompleteElement (replaces deprecated Autocomplete)
+    if (google.maps.places.PlaceAutocompleteElement) {
+      const placeAuto = new google.maps.places.PlaceAutocompleteElement({
+        componentRestrictions: { country: 'us' },
+      });
+      // Wrap input with autocomplete element
+      placeAuto.id = 'addr-autocomplete';
+      placeAuto.style.cssText = 'flex:1;';
+      // Replace input with autocomplete element
+      input.parentNode.insertBefore(placeAuto, input);
+      input.style.display = 'none';
+
+      placeAuto.addEventListener('gmp-placeselect', async (e) => {
+        const place = e.placePrediction.toPlace();
+        await place.fetchFields({ fields: ['formattedAddress','location'] });
+        const lat = place.location.lat();
+        const lng = place.location.lng();
+        document.getElementById('addr').value = place.formattedAddress;
+        runFromCoords(lat, lng);
+      });
+
+    } else if (google.maps.places.Autocomplete) {
+      // Fallback to legacy Autocomplete
+      const autocomplete = new google.maps.places.Autocomplete(input, {
+        componentRestrictions: { country: 'us' },
+        fields: ['formatted_address','geometry'],
+      });
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry?.location) {
+          document.getElementById('addr').value = place.formatted_address;
+          runFromCoords(place.geometry.location.lat(), place.geometry.location.lng());
+        }
+      });
     }
-  });
-  // Still allow Enter key to trigger search
-  input.addEventListener('keydown', e => { if(e.key==='Enter') runSearch(); });
+  } catch(e) {
+    console.warn('Places autocomplete init failed:', e.message);
+  }
+  // Always allow Enter key
+  document.getElementById('addr').addEventListener('keydown', e => { if(e.key==='Enter') runSearch(); });
 }
 
 function setStatus(msg, loading=false) {
@@ -407,6 +442,7 @@ function updateLayerControl() {
   if (fireLayer)    overlays['🟠 Fire perimeters (NIFC)'] = fireLayer;
   if (droughtLayer) overlays['💧 Drought monitor (NDMC)'] = droughtLayer;
   if (windLayer)    overlays['💨 Wind direction'] = windLayer;
+  if (smokeLayer)    overlays['🌫️ Wildfire smoke (PM2.5)'] = smokeLayer;
   if (portfolioLayer) overlays['📍 Insured properties'] = portfolioLayer;
   if (threatLayer)   overlays['⭕ Threat buffer rings'] = threatLayer;
   map._layerControl = L.control.layers(
@@ -498,15 +534,16 @@ function getDroughtScore(arcFeatures, calc) {
 async function addFireLayer(lat, lng) {
   if (fireLayer) map.removeLayer(fireLayer);
   try {
-    const url = `https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters_YTD/FeatureServer/0/query?where=1%3D1&outFields=IncidentName,GISAcres&geometry=${lng-4}%2C${lat-4}%2C${lng+4}%2C${lat+4}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=geojson`;
+    const url = `https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters_YearToDate/FeatureServer/0/query?where=1%3D1&outFields=poly_IncidentName,poly_GISAcres,attr_IncidentTypeCategory&geometry=${lng-4}%2C${lat-4}%2C${lng+4}%2C${lat+4}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=geojson`;
     const r = await fetch(url);
     const data = await r.json();
     if (data.features?.length) {
       fireLayer = L.geoJSON(data, {
         style:{fillColor:'#ff5500',color:'#cc2200',weight:1,fillOpacity:0.3},
         onEachFeature:(f,l) => {
-          const acres = f.properties.GISAcres ? Math.round(f.properties.GISAcres).toLocaleString() : '?';
-          l.bindPopup(`<b>${f.properties.IncidentName??'Unknown Fire'}</b><br>${acres} acres`);
+          const acres = (f.properties.poly_GISAcres||f.properties.GISAcres) ? Math.round(f.properties.poly_GISAcres||f.properties.GISAcres).toLocaleString() : '?';
+          const fname = f.properties.poly_IncidentName||f.properties.IncidentName||'Unknown Fire';
+          l.bindPopup(`<b>🔥 ${fname}</b><br>${acres} acres`);
         }
       }).addTo(map);
       return data.features.length;
@@ -1031,22 +1068,115 @@ async function fetchAndRenderSocialFeeds(lat, lng, state, county, city) {
   renderRSS(rssItems);
 }
 
+// ── Wildfire Smoke / PM2.5 — EPA AirNow ──────────────────────────────────────
+// AirNow tile service is CORS-free, no key required for tiles
+// Point query uses AirNow API (free, no key for basic use)
+
+function addSmokeLayer() {
+  if (smokeLayer) { try { map.removeLayer(smokeLayer); } catch(e) {} }
+  // EPA AirNow smoke/PM2.5 tile layer — CORS-free, updated hourly
+  smokeLayer = L.tileLayer(
+    'https://gispub.epa.gov/arcgis/rest/services/AIRNOW/pm25/MapServer/tile/{z}/{y}/{x}',
+    {
+      opacity: 0.55,
+      attribution: '🌫️ EPA AirNow PM2.5',
+      maxNativeZoom: 9,
+      maxZoom: 18,
+    }
+  );
+  smokeLayer.addTo(map);
+  updateLayerControl();
+}
+
+async function fetchSmokeData(lat, lng) {
+  try {
+    // AirNow API — current AQI for coordinates, no key needed for basic use
+    const url = `https://www.airnowapi.org/aq/observation/latLong/current/?format=application/json&latitude=${lat.toFixed(3)}&longitude=${lng.toFixed(3)}&distance=50&API_KEY=CF339A3B-1E5A-41B9-B422-DA4F7B07B13C`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error('AirNow API failed');
+    const data = await r.json();
+    if (!Array.isArray(data) || !data.length) return null;
+
+    // Find PM2.5 reading
+    const pm25 = data.find(d => d.ParameterName === 'PM2.5');
+    const ozone = data.find(d => d.ParameterName === 'OZONE');
+    return { pm25, ozone, all: data };
+  } catch(e) {
+    console.warn('AirNow API failed, using tile layer only:', e.message);
+    return null;
+  }
+}
+
+function renderSmoke(smokeData, lat, lng) {
+  const card = document.getElementById('smoke-card');
+  card.style.display = 'block';
+
+  if (!smokeData?.pm25) {
+    document.getElementById('smoke-content').innerHTML = `
+      <div style="font-size:12px;color:var(--muted);line-height:1.6">
+        No nearby PM2.5 monitor data available. Smoke layer visible on map.<br>
+        <a href="https://fire.airnow.gov/" target="_blank" style="color:var(--accent)">View EPA Fire & Smoke Map →</a>
+      </div>`;
+    return;
+  }
+
+  const pm = smokeData.pm25;
+  const aqi = pm.AQI;
+  const cat = pm.Category?.Name || 'Unknown';
+
+  // AQI color scale
+  const aqiStyle = aqi <= 50  ? { color:'#2d6a2d', bg:'#f0fff0', label:'Good' } :
+                   aqi <= 100 ? { color:'#b07a00', bg:'#fffbf0', label:'Moderate' } :
+                   aqi <= 150 ? { color:'#c4420a', bg:'#fff5f0', label:'Unhealthy for Sensitive Groups' } :
+                   aqi <= 200 ? { color:'#8b0000', bg:'#fff0f0', label:'Unhealthy' } :
+                   aqi <= 300 ? { color:'#6b0080', bg:'#fdf0ff', label:'Very Unhealthy' } :
+                                { color:'#4a0000', bg:'#fff0f0', label:'Hazardous' };
+
+  // Insurance relevance
+  const insuranceNote = aqi > 150 ? 'Smoke damage exposure is elevated — structural ventilation and contents damage risk increased.' :
+                        aqi > 100 ? 'Moderate smoke conditions — monitor for contents and HVAC system damage.' :
+                                    'Air quality acceptable — minimal smoke damage exposure at this time.';
+
+  document.getElementById('smoke-content').innerHTML = `
+    <div style="background:${aqiStyle.bg};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-family:var(--mono);font-size:36px;font-weight:500;color:${aqiStyle.color};line-height:1">${aqi}</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:${aqiStyle.color}">${aqiStyle.label}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">AQI · PM2.5 · ${pm.ReportingArea || 'Local area'}</div>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px">${insuranceNote}</div>
+    <div style="font-size:11px;color:var(--muted)">
+      Observed: ${pm.HourObserved}:00 · ${pm.DateObserved}
+      ${smokeData.ozone ? ` &nbsp;·&nbsp; Ozone AQI: ${smokeData.ozone.AQI}` : ''}
+    </div>
+    <div style="margin-top:8px">
+      <a href="https://fire.airnow.gov/#${lat},${lng},8z" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">EPA Fire & Smoke Map →</a>
+    </div>`;
+}
+
 // ── NIFC 7-Day ────────────────────────────────────────────────────────────────
 const NIFC_BASE = 'https://fsapps.nwcg.gov/psp/arcgis/rest/services/npsg/outlooks_forecast/MapServer';
-const FP_LABELS = { 'N':{label:'Normal',cls:'fp-normal',score:5},'E':{label:'Elevated',cls:'fp-elevated',score:35},'AN':{label:'Above Normal',cls:'fp-above',score:65},'C':{label:'Critical',cls:'fp-critical',score:90},'NORMAL':{label:'Normal',cls:'fp-normal',score:5},'ELEVATED':{label:'Elevated',cls:'fp-elevated',score:35},'ABOVE NORMAL':{label:'Above Normal',cls:'fp-above',score:65},'CRITICAL':{label:'Critical',cls:'fp-critical',score:90} };
+const FP_LABELS = { 'N':{label:'Normal',cls:'fp-normal',score:5},'E':{label:'Elevated',cls:'fp-elevated',score:35},'AN':{label:'Above Normal',cls:'fp-above',score:65},'C':{label:'Critical',cls:'fp-critical',score:90},'NORMAL':{label:'Normal',cls:'fp-normal',score:5},'ELEVATED':{label:'Elevated',cls:'fp-elevated',score:35},'ABOVE NORMAL':{label:'Above Normal',cls:'fp-above',score:65},'CRITICAL':{label:'Critical',cls:'fp-critical',score:90},'1':{label:'Normal',cls:'fp-normal',score:5},'2':{label:'Elevated',cls:'fp-elevated',score:35},'3':{label:'Above Normal',cls:'fp-above',score:65},'4':{label:'Critical',cls:'fp-critical',score:90} };
 
 async function fetchNIFC7Day(lat, lng) {
   const days = [];
   const geom = `${lng-0.5}%2C${lat-0.5}%2C${lng+0.5}%2C${lat+0.5}`;
   for (let i = 0; i < 7; i++) {
     try {
-      const url = `${NIFC_BASE}/${i}/query?where=1%3D1&outFields=*&geometry=${geom}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=json&resultRecordCount=1`;
+      const url = `${NIFC_BASE}/${i}/query?where=1%3D1&outFields=FirePotent,FirePotential,CLASS,SFP,POTENTIAL,PSANAME&geometry=${geom}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=json&resultRecordCount=1`;
       const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
       if (!r.ok) { days.push(null); continue; }
       const d = await r.json();
       if (!d.features?.length) { days.push(null); continue; }
       const attrs = d.features[0].attributes;
-      const raw = attrs.CLASS||attrs.SFP||attrs.POTENTIAL||attrs.potential||attrs.SIGNIFICANT_FIRE_POTENTIAL||attrs.Potential||Object.values(attrs).find(v=>typeof v==='string'&&v.length<=15)||null;
+      // Correct field is FirePotent per NIFC MapServer renderer definition
+      // PSANAME (e.g. NW05) is the area code — NOT the classification
+      const raw = attrs.FirePotent || attrs.FirePotential || attrs.FIRE_POTENTIAL ||
+                  attrs.CLASS || attrs.SFP || attrs.POTENTIAL || attrs.potential ||
+                  attrs.SIGNIFICANT_FIRE_POTENTIAL || null;
       const key = raw ? raw.toString().toUpperCase().trim() : null;
       const fp = key ? (FP_LABELS[key] || { label:raw, cls:'fp-none', score:20 }) : null;
       days.push(fp ? { ...fp, raw, attrs } : null);
@@ -1121,10 +1251,93 @@ async function getVegScore(lat, lng) {
   return { score:20, label:`Lower vegetation risk (${state||'unknown'})`, state:state||'?', county:loc.county||'', city:loc.city||'' };
 }
 
+// ── Terrain elevation scoring via Google Elevation API ───────────────────────
+// Samples elevation at property + 4 upwind points to calculate slope
+// Fire spread rate multiplier: +18% per degree of upslope (Rothermel model)
+async function getTerrainScore(lat, lng, windDir) {
+  try {
+    // Sample property location + 4 points ~2.5 miles upwind
+    // Wind comes FROM windDir, so upwind is opposite of fire spread
+    const upwindRad = windDir * Math.PI / 180; // direction wind comes from
+    const stepDeg = 2.5 / 69; // ~2.5 miles in degrees
+
+    const locations = [
+      { lat, lng }, // property
+      // Upwind points (where fire would come from)
+      { lat: lat + Math.cos(upwindRad)*stepDeg*1, lng: lng + Math.sin(upwindRad)*stepDeg*1 / Math.cos(lat*Math.PI/180) },
+      { lat: lat + Math.cos(upwindRad)*stepDeg*2, lng: lng + Math.sin(upwindRad)*stepDeg*2 / Math.cos(lat*Math.PI/180) },
+      { lat: lat + Math.cos(upwindRad)*stepDeg*3, lng: lng + Math.sin(upwindRad)*stepDeg*3 / Math.cos(lat*Math.PI/180) },
+      { lat: lat + Math.cos(upwindRad)*stepDeg*4, lng: lng + Math.sin(upwindRad)*stepDeg*4 / Math.cos(lat*Math.PI/180) },
+    ];
+
+    const locStr = locations.map(l => `${l.lat.toFixed(5)},${l.lng.toFixed(5)}`).join('|');
+    const url = `https://maps.googleapis.com/maps/api/elevation/json?locations=${encodeURIComponent(locStr)}&key=${API_KEY}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error('Elevation API failed');
+    const d = await r.json();
+    if (d.status !== 'OK' || !d.results?.length) throw new Error(d.status);
+
+    const elevations = d.results.map(r => r.elevation); // meters
+    const propertyElev = elevations[0];
+    const upwindElev = elevations.slice(1);
+
+    // Calculate slope from each upwind point to property
+    // Positive slope = fire running uphill toward property (dangerous)
+    // Negative slope = fire running downhill (less dangerous)
+    const distanceM = 2.5 * 1609.34; // meters per step
+    const slopes = upwindElev.map((e, i) => {
+      const rise = propertyElev - e; // positive = property is higher (fire runs up)
+      const run = distanceM * (i + 1);
+      return Math.atan(rise / run) * 180 / Math.PI; // degrees
+    });
+
+    const maxSlope = Math.max(...slopes);
+    const avgSlope = slopes.reduce((a,b)=>a+b,0) / slopes.length;
+    const elevDiff = propertyElev - Math.min(...upwindElev);
+
+    // Score: Rothermel fire spread model — slope is exponential
+    // 0° flat = baseline, 30° = 2x spread rate, 45°+ = 4x+
+    let score, label;
+    if (maxSlope >= 35) {
+      score = 95;
+      label = `Extreme terrain risk — ${Math.round(maxSlope)}° upslope from fire approach direction, fire spread rate 4x+`;
+    } else if (maxSlope >= 25) {
+      score = 80;
+      label = `High terrain risk — ${Math.round(maxSlope)}° upslope, fire spread rate 3x faster than flat`;
+    } else if (maxSlope >= 15) {
+      score = 60;
+      label = `Moderate terrain risk — ${Math.round(maxSlope)}° upslope, fire spread rate 2x faster than flat`;
+    } else if (maxSlope >= 5) {
+      score = 38;
+      label = `Mild upslope — ${Math.round(maxSlope)}°, moderate terrain amplification`;
+    } else if (avgSlope < -5) {
+      score = 15;
+      label = `Downslope terrain — fire would run away from property, reduced spread risk`;
+    } else {
+      score = 22;
+      label = `Relatively flat terrain — ${Math.round(Math.abs(avgSlope))}° slope, minimal terrain amplification`;
+    }
+
+    // Add elevation context
+    const elevFt = Math.round(propertyElev * 3.281);
+    label += ` · Elevation: ${elevFt.toLocaleString()}ft`;
+
+    return { score, label, slope: maxSlope, elevation: propertyElev, elevFt };
+
+  } catch(e) {
+    console.warn('Terrain scoring failed:', e.message);
+    // Fallback to regional heuristic
+    const score = lng < -100 ? 55 : lng < -85 ? 35 : 20;
+    const label = lng < -100 ? 'Western terrain (elevation API unavailable)' : 'Terrain data unavailable';
+    return { score, label, slope: null, elevation: null };
+  }
+}
+
+// Keep legacy WUI as fallback only
 function getWUIScore(lat, lng) {
-  if (lng < -100) return { score:72, label:'High WUI density — western region' };
-  if (lng < -85)  return { score:45, label:'Moderate WUI exposure' };
-  return { score:22, label:'Lower WUI exposure — eastern region' };
+  if (lng < -100) return { score:55, label:'Western terrain — elevation scoring unavailable' };
+  if (lng < -85)  return { score:35, label:'Moderate terrain — elevation scoring unavailable' };
+  return { score:20, label:'Eastern terrain — elevation scoring unavailable' };
 }
 
 function getFireScore(count) {
@@ -1140,7 +1353,7 @@ function getInfraScore(iso) {
 }
 
 function compositeScore(f) {
-  return Math.round(f.drought.score*0.25 + f.veg.score*0.18 + f.wui.score*0.18 + f.fire.score*0.18 + f.infra.score*0.09 + (f.nifc?.score||20)*0.12);
+  return Math.round(f.drought.score*0.25 + f.veg.score*0.18 + (f.terrain||f.wui).score*0.18 + f.fire.score*0.18 + f.infra.score*0.09 + (f.nifc?.score||20)*0.12);
 }
 
 function riskStyle(score) {
@@ -1170,15 +1383,18 @@ function renderResults(score, factors, addr, wx) {
   document.getElementById('risk-meter-fill').style.width = score + '%';
   document.getElementById('risk-meter-fill').style.background = rs.color;
   document.getElementById('pdf-btn').disabled = false;
+  const terrain = factors.terrain || factors.wui;
   document.getElementById('meta-row').innerHTML = `
     <div class="meta-item">Assessed: <span>${new Date().toLocaleString()}</span></div>
     <div class="meta-item">State: <span>${factors.veg.state||'—'}</span></div>
     <div class="meta-item">Drought: <span>${factors.drought.dm>=0?'D'+factors.drought.dm:'None'}</span></div>
+    ${terrain?.slope != null ? `<div class="meta-item">Max slope: <span>${Math.round(terrain.slope)}°</span></div>` : ''}
+    ${terrain?.elevFt ? `<div class="meta-item">Elevation: <span>${terrain.elevFt.toLocaleString()}ft</span></div>` : ''}
     ${wx ? `<div class="meta-item">Humidity: <span>${wx.humidity}%</span></div>` : ''}`;
   const factorData = [
     { name:'Drought severity', weight:'25%', score:factors.drought.score, sub:factors.drought.label },
     { name:'Vegetation type', weight:'18%', score:factors.veg.score, sub:factors.veg.label },
-    { name:'WUI proximity', weight:'18%', score:factors.wui.score, sub:factors.wui.label },
+    { name:'Terrain & fire spread', weight:'18%', score:(factors.terrain||factors.wui).score, sub:(factors.terrain||factors.wui).label },
     { name:'Fire history', weight:'18%', score:factors.fire.score, sub:factors.fire.label },
     { name:'Response capacity (ISO)', weight:'9%', score:factors.infra.score, sub:factors.infra.label },
     { name:'NIFC 7-day fire potential', weight:'12%', score:factors.nifc?.score||20, sub:factors.nifc?.label||'NIFC forecast unavailable' },
@@ -1206,6 +1422,8 @@ function clearResults() {
   if (windLayer) { try { map.removeLayer(windLayer); } catch(e) {} windLayer = null; }
   if (windAnimFrame) { cancelAnimationFrame(windAnimFrame); windAnimFrame = null; }
   if (windCanvas) { if (windCanvas._resizeObs) windCanvas._resizeObs.disconnect(); windCanvas.remove(); windCanvas = null; }
+  if (smokeLayer) { try { map.removeLayer(smokeLayer); } catch(e) {} smokeLayer = null; }
+  document.getElementById('smoke-card').style.display = 'none';
   if (portfolioLayer) { try { map.removeLayer(portfolioLayer); } catch(e) {} portfolioLayer = null; }
   if (threatLayer) { try { map.removeLayer(threatLayer); } catch(e) {} threatLayer = null; }
   setStatus('Enter a property address to generate a wildfire risk assessment.');
@@ -1232,13 +1450,16 @@ async function runFromCoords(lat, lng) {
     setStatus('Loading all risk data...', true);
     const [droughtFeatures, droughtCalc, fireCount, vegData, wxData, redFlag, nifc] = await Promise.all([addDroughtLayer(lat,lng), fetchDroughtIndex(lat,lng), addFireLayer(lat,lng), getVegScore(lat,lng), fetchWeather(lat,lng), fetchRedFlagWarnings(lat,lng), fetchNIFC7Day(lat,lng)]);
     const state = vegData.state, county = vegData.county||'', city = vegData.city||'';
-    const [isoData] = await Promise.all([getISOClass(lat,lng,state)]);
+    const windDir = wxData?.wind_direction_10m || 180;
+    const [isoData, terrainData, smokeData] = await Promise.all([getISOClass(lat,lng,state), getTerrainScore(lat,lng,windDir), fetchSmokeData(lat,lng)]);
     const wx = renderWeather(wxData);
     renderRedFlag(redFlag);
     renderISO(isoData);
     renderNIFCForecast(nifc);
+    renderSmoke(smokeData, lat, lng);
+    addSmokeLayer();
     fetchAndRenderSocialFeeds(lat, lng, state, county, city);
-    const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
+    const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, terrain:terrainData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
     const score = compositeScore(factors);
     renderResults(score, factors, `📍 ${fmtAddr}`, wx);
     updateLayerControl();
@@ -1275,13 +1496,16 @@ async function runSearch() {
     marker = L.marker([lat,lng]).addTo(map).bindPopup(`<b>${fmtAddr}</b>`).openPopup();
     const [droughtFeatures, droughtCalc, fireCount, vegData, wxData, redFlag, nifc] = await Promise.all([addDroughtLayer(lat,lng), fetchDroughtIndex(lat,lng), addFireLayer(lat,lng), getVegScore(lat,lng), fetchWeather(lat,lng), fetchRedFlagWarnings(lat,lng), fetchNIFC7Day(lat,lng)]);
     const state = vegData.state, county = vegData.county||'', city = vegData.city||'';
-    const [isoData] = await Promise.all([getISOClass(lat,lng,state)]);
+    const windDir = wxData?.wind_direction_10m || 180;
+    const [isoData, terrainData, smokeData] = await Promise.all([getISOClass(lat,lng,state), getTerrainScore(lat,lng,windDir), fetchSmokeData(lat,lng)]);
     const wx = renderWeather(wxData);
     renderRedFlag(redFlag);
     renderISO(isoData);
     renderNIFCForecast(nifc);
+    renderSmoke(smokeData, lat, lng);
+    addSmokeLayer();
     fetchAndRenderSocialFeeds(lat, lng, state, county, city);
-    const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
+    const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, terrain:terrainData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
     const score = compositeScore(factors);
     renderResults(score, factors, fmtAddr, wx);
     updateLayerControl();
@@ -1330,7 +1554,7 @@ function exportPDF() {
   doc.setTextColor(100,96,92); doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.text('FACTOR BREAKDOWN', M, y+1);
   doc.setDrawColor(210,205,198); doc.setLineWidth(0.5); doc.line(M,y+5,W-M,y+5);
   y += 16;
-  const factorData = [{name:'Drought Severity',weight:'25%',score:factors.drought.score,sub:factors.drought.label},{name:'Vegetation Type',weight:'18%',score:factors.veg.score,sub:factors.veg.label},{name:'WUI Proximity',weight:'18%',score:factors.wui.score,sub:factors.wui.label},{name:'Fire History',weight:'18%',score:factors.fire.score,sub:factors.fire.label},{name:'Response Cap. (ISO)',weight:'9%',score:factors.infra.score,sub:factors.infra.label},{name:'NIFC 7-Day Forecast',weight:'12%',score:factors.nifc?.score||20,sub:factors.nifc?.label||'NIFC data unavailable'}];
+  const factorData = [{name:'Drought Severity',weight:'25%',score:factors.drought.score,sub:factors.drought.label},{name:'Vegetation Type',weight:'18%',score:factors.veg.score,sub:factors.veg.label},{name:'Terrain & Fire Spread',weight:'18%',score:(factors.terrain||factors.wui).score,sub:(factors.terrain||factors.wui).label},{name:'Fire History',weight:'18%',score:factors.fire.score,sub:factors.fire.label},{name:'Response Cap. (ISO)',weight:'9%',score:factors.infra.score,sub:factors.infra.label},{name:'NIFC 7-Day Forecast',weight:'12%',score:factors.nifc?.score||20,sub:factors.nifc?.label||'NIFC data unavailable'}];
   function fBarColor(s) { if(s>=75)return[196,66,10];if(s>=50)return[224,123,0];if(s>=25)return[212,160,23];return[74,143,74]; }
   const ROW = 46;
   factorData.forEach(f => {
@@ -1350,7 +1574,7 @@ function exportPDF() {
   doc.setDrawColor(210,205,198); doc.line(M,y+4,W-M,y+4);
   y += 14;
   doc.setFont('helvetica','normal'); doc.setTextColor(120,115,108); doc.setFontSize(8);
-  const note = 'Composite score: drought 25%, vegetation 18%, WUI proximity 18%, fire history 18%, response capacity/ISO 9%, NIFC 7-day 12%. Sources: NDMC Drought Monitor, WFIGS fire perimeters, NOAA NWS, Open-Meteo, NASA FIRMS, NIFC, ISO PPC estimate.';
+  const note = 'Composite score: drought 25%, vegetation 18%, terrain/fire spread 18%, fire history 18%, response capacity/ISO 9%, NIFC 7-day 12%. Terrain scoring uses Google Elevation API — slope calculated from 4 upwind sample points per Rothermel fire spread model. Sources: NDMC Drought Monitor, WFIGS fire perimeters, NOAA NWS, Open-Meteo, NASA FIRMS, NIFC, Google Elevation API, ISO PPC estimate.';
   const noteLines = doc.splitTextToSize(note, CW);
   doc.text(noteLines, M, y);
   y += noteLines.length*11+10;
@@ -1370,61 +1594,36 @@ let nationalFireLayer = null;
 
 async function loadNationalFirePerimeters() {
   if (nationalFireLayer) { try { map.removeLayer(nationalFireLayer); } catch(e) {} }
+
+  // GeoJSON fetch fails due to CORS on this ArcGIS endpoint from the browser
+  // Use NIFC cached map tiles instead — same data, CORS-free, renders immediately
   try {
-    // Query WFIGS for all active YTD perimeters — western US focus (AMERIND portfolio)
-    const url = `https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters_YTD/FeatureServer/0/query?where=1%3D1&outFields=IncidentName,GISAcres,PercentContained,POOState&geometry=-130%2C25%2C-65%2C55&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&f=geojson&resultRecordCount=200&orderByFields=GISAcres+DESC`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    if (!r.ok) return;
-    const data = await r.json();
-    if (!data.features?.length) return;
-
-    nationalFireLayer = L.geoJSON(data, {
-      style: f => {
-        const acres = f.properties.GISAcres || 0;
-        // Larger fires = more opaque / brighter
-        const opacity = acres > 10000 ? 0.55 : acres > 1000 ? 0.40 : 0.25;
-        const fillOpacity = acres > 10000 ? 0.20 : acres > 1000 ? 0.12 : 0.06;
-        return { color: '#cc2200', fillColor: '#ff5500', weight: 1.5, opacity, fillOpacity };
-      },
-      onEachFeature: (f, l) => {
-        const name = f.properties.IncidentName || 'Unknown Fire';
-        const acres = f.properties.GISAcres ? Math.round(f.properties.GISAcres).toLocaleString() : '?';
-        const pct = f.properties.PercentContained != null ? `${Math.round(f.properties.PercentContained)}% contained` : 'Containment unknown';
-        const state = f.properties.POOState || '';
-        l.bindPopup(`<div style="font-size:13px"><b>🔥 ${name}</b><br><span style="color:#666">${state}</span><br>${acres} acres &nbsp;·&nbsp; ${pct}</div>`);
-        l.on('mouseover', () => l.setStyle({ fillOpacity: 0.35, weight: 2.5 }));
-        l.on('mouseout', () => nationalFireLayer.resetStyle(l));
+    nationalFireLayer = L.tileLayer(
+      'https://tiles.arcgis.com/tiles/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters_YearToDate/MapServer/tile/{z}/{y}/{x}',
+      {
+        opacity: 0.65,
+        attribution: '🔥 NIFC WFIGS Fire Perimeters',
+        maxNativeZoom: 14,
+        maxZoom: 18,
       }
-    }).addTo(map);
+    );
 
-    // Add to layer control
-    if (map._layerControl) map.removeControl(map._layerControl);
-    const overlays = {};
-    overlays['🔥 NASA FIRMS hotspots'] = firmsLayer;
-    overlays['🟠 Active fire perimeters'] = nationalFireLayer;
-    if (fireLayer)      overlays['🟠 Fire perimeters (local)'] = fireLayer;
-    if (droughtLayer)   overlays['💧 Drought monitor (NDMC)'] = droughtLayer;
-    if (windLayer)      overlays['💨 Wind direction'] = windLayer;
-    if (portfolioLayer) overlays['📍 Insured properties'] = portfolioLayer;
-    if (threatLayer)    overlays['⭕ Threat buffer rings'] = threatLayer;
-    map._layerControl = L.control.layers(
-      { 'Google Maps': map._baseMapLayer },
-      overlays,
-      { collapsed: true, position: 'bottomleft' }
-    ).addTo(map);
+    nationalFireLayer.addTo(map);
+    updateLayerControl();
+    setStatus('Active fire perimeters loaded — enter an address to assess a specific property.');
+    console.log('National fire perimeter tile layer added');
 
-    console.log(`National fire perimeters: ${data.features.length} fires loaded`);
-    setStatus(`${data.features.length} active fire perimeters loaded — enter an address to assess a specific property.`);
-
-  } catch(e) { console.warn('National fire perimeters failed:', e.message); }
+  } catch(e) {
+    console.warn('National fire perimeters failed:', e.message);
+  }
 }
 
 window.addEventListener('load', () => {
   // Center on AMERIND portfolio footprint — western/central US
   initMap(44, -108, 4);
 
-  // Load national fire perimeters immediately
-  setTimeout(() => loadNationalFirePerimeters(), 800);
+  // Load national fire perimeters — tile layer, CORS-free, instant
+  setTimeout(() => loadNationalFirePerimeters(), 1200);
 
   // Auto-run from monitor alert hash: index.html#lat,lng,label
   const hash = window.location.hash.replace('#','');
