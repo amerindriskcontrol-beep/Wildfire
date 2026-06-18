@@ -133,6 +133,16 @@ header { background: var(--text); color: #fff; padding: 14px 32px; display: flex
 .fp-above { background: #fff5f0; color: #c4420a; }
 .fp-critical { background: #fff0f0; color: #8b0000; }
 .fp-none { background: var(--bg); color: var(--muted); }
+/* Fire stats grid — RZAlert style */
+.fire-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.fire-stat { background: var(--bg); border-radius: var(--radius); padding: 10px 12px; }
+.fire-stat-val { font-family: var(--mono); font-size: 22px; font-weight: 500; line-height: 1; }
+.fire-stat-label { font-size: 10px; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+.fire-stat-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.fire-stat.critical .fire-stat-val { color: #8b0000; }
+.fire-stat.high .fire-stat-val { color: #c4420a; }
+.fire-stat.moderate .fire-stat-val { color: #b07a00; }
+.fire-stat.good .fire-stat-val { color: #2d6a2d; }
 .below-grid-full { margin-top: 20px; }
 footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px; }
 .footer-sources { max-width: 1200px; margin: 0 auto; padding: 28px 24px 20px; }
@@ -240,6 +250,12 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
         <div class="card-title">Wildfire smoke exposure (PM2.5)</div>
         <div id="smoke-content"></div>
         <div style="font-size:10px;color:var(--muted);margin-top:8px">Source: EPA AirNow — updated hourly</div>
+      </div>
+
+      <!-- Active fire stats — RZAlert style -->
+      <div class="card" id="fire-stats-card" style="display:none">
+        <div class="card-title">Nearby fire activity</div>
+        <div id="fire-stats-content"></div>
       </div>
 
       <div class="card factors-card" id="factors-card">
@@ -1075,13 +1091,16 @@ async function fetchAndRenderSocialFeeds(lat, lng, state, county, city) {
 function addSmokeLayer() {
   if (smokeLayer) { try { map.removeLayer(smokeLayer); } catch(e) {} }
   // EPA AirNow smoke/PM2.5 tile layer — CORS-free, updated hourly
-  smokeLayer = L.tileLayer(
-    'https://gispub.epa.gov/arcgis/rest/services/AIRNOW/pm25/MapServer/tile/{z}/{y}/{x}',
+  // EPA AirNow PM2.5 contour tiles — confirmed working endpoint
+  smokeLayer = L.tileLayer.wms(
+    'https://gispub.epa.gov/arcgis/services/OAR_OAQPS/AirNowLatestContours/MapServer/WMSServer',
     {
-      opacity: 0.55,
+      layers: '0',
+      format: 'image/png',
+      transparent: true,
+      opacity: 0.5,
       attribution: '🌫️ EPA AirNow PM2.5',
-      maxNativeZoom: 9,
-      maxZoom: 18,
+      version: '1.3.0',
     }
   );
   smokeLayer.addTo(map);
@@ -1155,6 +1174,65 @@ function renderSmoke(smokeData, lat, lng) {
     <div style="margin-top:8px">
       <a href="https://fire.airnow.gov/#${lat},${lng},8z" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">EPA Fire & Smoke Map →</a>
     </div>`;
+}
+
+// ── Fire stats card — RZAlert style incident summary ─────────────────────────
+async function fetchAndRenderFireStats(lat, lng) {
+  try {
+    const url = `https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0/query?where=1%3D1&outFields=IncidentName,DailyAcres,PercentContained,FireDiscoveryDateTime,POOState,POOCounty,IsCpxChild&geometry=${lng-5}%2C${lat-5}%2C${lng+5}%2C${lat+5}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&orderByFields=DailyAcres+DESC&resultRecordCount=5&f=json`;
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 8000));
+    const response = await Promise.race([fetch(url), timeout]);
+    if (!response.ok) return;
+    const d = await response.json();
+    const fires = d.features || [];
+    const card = document.getElementById('fire-stats-card');
+    if (!fires.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+
+    const largest = fires[0].attributes;
+    const name = largest.IncidentName || 'Unknown Fire';
+    const acres = largest.DailyAcres ? Math.round(largest.DailyAcres) : 0;
+    const contained = largest.PercentContained != null ? Math.round(largest.PercentContained) : null;
+    const state = largest.POOState || '';
+    const county = largest.POOCounty || '';
+    const discovered = largest.FireDiscoveryDateTime ? new Date(largest.FireDiscoveryDateTime) : null;
+    const daysActive = discovered ? Math.ceil((Date.now() - discovered) / 86400000) : null;
+
+    // Closest fire distance
+    const closestMiles = null; // would need coordinates for exact distance
+
+    const containedColor = contained == null ? '#888' : contained >= 75 ? '#2d6a2d' : contained >= 40 ? '#b07a00' : '#8b0000';
+    const acresClass = acres > 10000 ? 'critical' : acres > 1000 ? 'high' : acres > 100 ? 'moderate' : 'good';
+
+    document.getElementById('fire-stats-content').innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div style="font-size:14px;font-weight:600">🔥 ${name}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${county ? county+', ' : ''}${state} — largest fire within 350mi</div>
+        </div>
+      </div>
+      <div class="fire-stats-grid">
+        <div class="fire-stat ${acresClass}">
+          <div class="fire-stat-val">${acres >= 1000 ? (acres/1000).toFixed(1)+'k' : acres || '?'}</div>
+          <div class="fire-stat-label">acres burned</div>
+        </div>
+        <div class="fire-stat">
+          <div class="fire-stat-val" style="color:${containedColor}">${contained != null ? contained+'%' : '?'}</div>
+          <div class="fire-stat-label">contained</div>
+        </div>
+        ${daysActive != null ? `<div class="fire-stat"><div class="fire-stat-val">${daysActive}</div><div class="fire-stat-label">days active</div></div>` : ''}
+        <div class="fire-stat">
+          <div class="fire-stat-val">${fires.length}</div>
+          <div class="fire-stat-label">active fires nearby</div>
+        </div>
+      </div>
+      ${fires.length > 1 ? `<div style="margin-top:10px;padding-top:8px;border-top:0.5px solid var(--border);font-size:11px;color:var(--muted)">
+        Other fires: ${fires.slice(1).map(f => f.attributes.IncidentName || 'Unknown').join(' · ')}
+      </div>` : ''}`;
+  } catch(e) {
+    console.warn('Fire stats failed:', e.message);
+    document.getElementById('fire-stats-card').style.display = 'none';
+  }
 }
 
 // ── NIFC 7-Day ────────────────────────────────────────────────────────────────
@@ -1424,6 +1502,7 @@ function clearResults() {
   if (windCanvas) { if (windCanvas._resizeObs) windCanvas._resizeObs.disconnect(); windCanvas.remove(); windCanvas = null; }
   if (smokeLayer) { try { map.removeLayer(smokeLayer); } catch(e) {} smokeLayer = null; }
   document.getElementById('smoke-card').style.display = 'none';
+  document.getElementById('fire-stats-card').style.display = 'none';
   if (portfolioLayer) { try { map.removeLayer(portfolioLayer); } catch(e) {} portfolioLayer = null; }
   if (threatLayer) { try { map.removeLayer(threatLayer); } catch(e) {} threatLayer = null; }
   setStatus('Enter a property address to generate a wildfire risk assessment.');
@@ -1457,6 +1536,7 @@ async function runFromCoords(lat, lng) {
     renderISO(isoData);
     renderNIFCForecast(nifc);
     renderSmoke(smokeData, lat, lng);
+    fetchAndRenderFireStats(lat, lng);
     addSmokeLayer();
     fetchAndRenderSocialFeeds(lat, lng, state, county, city);
     const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, terrain:terrainData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
@@ -1503,6 +1583,7 @@ async function runSearch() {
     renderISO(isoData);
     renderNIFCForecast(nifc);
     renderSmoke(smokeData, lat, lng);
+    fetchAndRenderFireStats(lat, lng);
     addSmokeLayer();
     fetchAndRenderSocialFeeds(lat, lng, state, county, city);
     const factors = { drought:getDroughtScore(droughtFeatures,droughtCalc), veg:vegData, terrain:terrainData, wui:getWUIScore(lat,lng), fire:getFireScore(fireCount), infra:getInfraScore(isoData), nifc:getNIFCScore(nifc) };
