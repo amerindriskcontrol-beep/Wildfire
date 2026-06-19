@@ -26,15 +26,11 @@ header{background:var(--text);color:#fff;padding:14px 32px;display:flex;align-it
 .container{max-width:1200px;margin:0 auto;padding:28px 24px;}
 .page{display:none;}
 .page.active{display:block;}
-
-/* Stats row */
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px;}
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;}
 .stat-val{font-family:var(--mono);font-size:28px;font-weight:500;}
 .stat-label{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.06em;}
 .stat-sub{font-size:11px;color:var(--muted);margin-top:6px;}
-
-/* Alert inbox */
 .alert-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
 .alert-filters{display:flex;gap:8px;}
 .filter-btn{padding:6px 14px;font-size:12px;font-weight:500;border:1px solid var(--border);border-radius:20px;cursor:pointer;background:var(--surface);color:var(--muted);transition:all 0.15s;}
@@ -63,8 +59,6 @@ header{background:var(--text);color:#fff;padding:14px 32px;display:flex;align-it
 .btn-outline:hover{background:var(--bg);}
 .btn-sm{padding:5px 12px;font-size:12px;}
 .btn-danger{background:#fff0f0;color:var(--critical);border:1px solid #ffcccc;}
-
-/* Upload section */
 .upload-zone{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:40px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--surface);}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-light);}
 .upload-zone-icon{font-size:32px;margin-bottom:12px;}
@@ -107,7 +101,6 @@ table.portfolio-table tr:hover td{background:var(--bg);}
 .conf-low{background:#fff0f0;color:#8b0000;}
 .tiv-bar{height:4px;background:var(--border);border-radius:2px;margin-top:2px;}
 .tiv-bar-fill{height:100%;background:var(--accent);border-radius:2px;}
-/* Moratorium weight sliders */
 .weight-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .weight-label{font-size:12px;font-weight:500;color:var(--text);width:180px;flex-shrink:0;}
 .weight-val{font-family:var(--mono);font-size:12px;font-weight:500;width:38px;text-align:right;color:var(--accent);flex-shrink:0;}
@@ -120,7 +113,8 @@ table.portfolio-table tr:hover td{background:var(--bg);}
 .tier-pip-action{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4;}
 .mora-preview{border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;align-items:center;gap:16px;border:1px solid var(--border);}
 .mora-score-big{font-family:var(--mono);font-size:32px;font-weight:500;line-height:1;}
-
+/* Geocode progress */
+.geocode-log{font-family:var(--mono);font-size:11px;color:var(--muted);max-height:120px;overflow-y:auto;background:var(--bg);border-radius:var(--radius);padding:10px 12px;margin-top:10px;line-height:1.8;}
 </style>
 </head>
 <body>
@@ -144,7 +138,6 @@ table.portfolio-table tr:hover td{background:var(--bg);}
 
 <div class="container">
 
-  <!-- Stats always visible -->
   <div class="stats-row" id="stats-row">
     <div class="stat-card">
       <div class="stat-val" id="stat-total">—</div>
@@ -210,7 +203,29 @@ table.portfolio-table tr:hover td{background:var(--bg);}
     <div class="card" id="col-map-card" style="display:none">
       <div class="card-title">Column mapping — match your columns to required fields</div>
       <div id="col-map-rows"></div>
-      <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+
+      <!-- Geocoding mode selector -->
+      <div style="margin-top:16px;padding:14px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text)">📍 Location source</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+            <input type="radio" name="geo-mode" value="google" id="geo-google" checked style="margin-top:2px"/>
+            <div>
+              <div style="font-size:12px;font-weight:500">Geocode from physical address <span style="color:var(--low);font-size:10px">✓ Recommended</span></div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">Uses Google Maps to get precise rooftop coordinates from address, city, state, ZIP. Fixes duplicate coordinate issues from Geocodio ZIP centroid fallback.</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+            <input type="radio" name="geo-mode" value="csv" id="geo-csv" style="margin-top:2px"/>
+            <div>
+              <div style="font-size:12px;font-weight:500">Use lat/lng from CSV</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">Uses coordinates already in the file. Fast but may include ZIP centroid fallbacks.</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <div>
           <label style="font-size:12px;font-weight:500;margin-right:8px">Upload mode:</label>
           <select id="upload-mode" style="padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">
@@ -222,19 +237,20 @@ table.portfolio-table tr:hover td{background:var(--bg);}
         <span id="upload-status" style="font-size:12px;color:var(--muted)"></span>
       </div>
       <div class="progress-bar" id="upload-progress-bar" style="display:none"><div class="progress-fill" id="upload-progress-fill" style="width:0%"></div></div>
+      <div class="geocode-log" id="geocode-log" style="display:none"></div>
     </div>
 
     <div class="card">
       <div class="card-title">Expected CSV format</div>
       <div style="font-size:12px;color:var(--muted);line-height:1.8">
-        Required columns: <strong style="color:var(--text)">lat</strong> (or latitude), <strong style="color:var(--text)">lng</strong> (or longitude)<br>
-        Recommended: <strong style="color:var(--text)">address, city, state, zip, tiv, confidence, policy_number, tribe, location_type</strong><br>
-        TIV should be numeric (e.g. 250000). Confidence 0–100. Location type: ROOFTOP, RANGE_INTERPOLATED, GEOMETRIC_CENTER, APPROXIMATE.
+        With Google geocoding: <strong style="color:var(--text)">address, city, state, zip</strong> are used to get precise coordinates. lat/lng from CSV are ignored.<br>
+        Also recommended: <strong style="color:var(--text)">tiv, policy_number, tribe, cell</strong><br>
+        Cell values: <strong style="color:var(--text)">TGB</strong> (Tribal Government Buildings) or <strong style="color:var(--text)">IHBG</strong> (Indian Housing Block Grant)
       </div>
       <div style="margin-top:12px;font-family:var(--mono);font-size:11px;background:var(--bg);padding:12px;border-radius:var(--radius);color:var(--muted)">
-        address,city,state,zip,lat,lng,tiv,confidence,policy_number,tribe,location_type<br>
-        "123 Main St","Flagstaff","AZ","86001",35.1983,-111.6513,250000,95,POL-001,"Navajo Nation",ROOFTOP<br>
-        "456 Tribal Rd","Nespelem","WA","99155",48.1734,-118.9742,185000,72,POL-002,"Colville",RANGE_INTERPOLATED
+        location_address,location_city,location_state,location_zip,tiv,policy_number,TribalAffiliation,cell<br>
+        "123 Main St","Flagstaff","AZ","86001",250000,POL-001,"Navajo Nation",TGB<br>
+        "456 Tribal Rd","Nespelem","WA","99155",185000,POL-002,"Colville Tribes",IHBG
       </div>
     </div>
   </div>
@@ -242,7 +258,6 @@ table.portfolio-table tr:hover td{background:var(--bg);}
   <!-- SETTINGS -->
   <div class="page" id="page-config">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-
       <div>
         <div class="card">
           <div class="card-title">Alert thresholds</div>
@@ -269,13 +284,11 @@ table.portfolio-table tr:hover td{background:var(--bg);}
           <button class="btn btn-primary" style="margin-top:8px" onclick="saveConfig()">Save thresholds</button>
         </div>
 
-        <!-- MORATORIUM SCORING WEIGHTS -->
         <div class="card">
           <div class="card-title">Moratorium score — factor weights</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
             Adjust how each factor contributes to the territory-level moratorium score. Weights must total 100%.
           </div>
-
           <div class="weight-row">
             <div class="weight-label">Active fires within proximity</div>
             <input type="range" min="0" max="60" step="1" value="25" id="w-fire" style="flex:1" oninput="updateWeights()"/>
@@ -306,13 +319,10 @@ table.portfolio-table tr:hover td{background:var(--bg);}
             <input type="range" min="0" max="60" step="1" value="8" id="w-topo" style="flex:1" oninput="updateWeights()"/>
             <div class="weight-val" id="wv-topo">8%</div>
           </div>
-
           <div class="weight-total-row">
             <div style="font-size:12px;color:var(--muted)">Total weight</div>
             <div class="weight-total" id="weight-total" style="color:var(--low)">100%</div>
           </div>
-
-          <!-- Tier threshold sliders -->
           <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
             <div style="font-size:11px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:12px">Tier thresholds</div>
             <div class="weight-row">
@@ -331,11 +341,7 @@ table.portfolio-table tr:hover td{background:var(--bg);}
               <div class="weight-val" id="tv-mora" style="color:#8b0000">80</div>
             </div>
           </div>
-
-          <!-- Live tier preview -->
           <div class="tier-preview" id="tier-preview"></div>
-
-          <!-- Live score preview -->
           <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
             <div style="font-size:11px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Preview — sample territory</div>
             <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Simulates a territory with 2 nearby fires, D3 drought, 45% high-risk properties, 60% TIV exposed, active red flag, high terrain risk.</div>
@@ -347,7 +353,6 @@ table.portfolio-table tr:hover td{background:var(--bg);}
               </div>
             </div>
           </div>
-
           <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
             <button class="btn btn-primary btn-sm" onclick="saveMoratoriumWeights()">Save moratorium model</button>
             <button class="btn btn-outline btn-sm" onclick="resetWeights()">Reset to defaults</button>
@@ -396,7 +401,6 @@ table.portfolio-table tr:hover td{background:var(--bg);}
           </div>
         </div>
       </div>
-
     </div>
   </div>
 
@@ -404,14 +408,10 @@ table.portfolio-table tr:hover td{background:var(--bg);}
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script>
-// ══════════════════════════════════════════════════════════════
-// CONFIGURE THESE TWO VALUES — your Supabase project settings
-// Supabase → Settings → API
 const SUPA_URL = 'https://cwnshkewhrummwpnfwlh.supabase.co';
 const SUPA_KEY = 'sb_publishable__A6TaNRi-IUANSefmaNAnA_sEGGhqAQ';
-// ══════════════════════════════════════════════════════════════
+const GOOGLE_KEY = 'AIzaSyDomOvPPEUknUqFW-QFo3Eh6OD-g3lorVs';
 
-// Supabase REST helper
 async function sb(table, options = {}) {
   const { filter='', method='GET', body=null, prefer='return=representation', select='' } = options;
   const params = [];
@@ -438,7 +438,6 @@ let parsedRows = [];
 let detectedColumns = [];
 let currentFilter = 'all';
 
-// ── Navigation ────────────────────────────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -448,7 +447,6 @@ function showPage(name) {
   if (name === 'portfolio') loadPortfolioTable();
 }
 
-// ── Stats ─────────────────────────────────────────────────────────────────────
 async function loadStats() {
   try {
     const [propsRaw, runsRaw] = await Promise.all([
@@ -484,13 +482,8 @@ function timeAgo(dateStr) {
   return Math.floor(diff/86400) + 'd ago';
 }
 
-// ── Alert inbox ───────────────────────────────────────────────────────────────
 async function loadAlerts() {
   try {
-    if (!SUPA_URL || SUPA_URL.includes('YOUR_SUPABASE')) {
-      document.getElementById('alert-list').innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div>Add your Supabase URL and anon key to the top of this file to connect.</div>';
-      return;
-    }
     const result = await sb('alerts', { filter: 'order=created_at.desc&limit=200' });
     allAlerts = Array.isArray(result) ? result : [];
     renderAlerts();
@@ -511,14 +504,11 @@ function renderAlerts() {
   let filtered = allAlerts;
   if (currentFilter === 'unacked') filtered = allAlerts.filter(a=>!a.acknowledged);
   else if (currentFilter !== 'all') filtered = allAlerts.filter(a=>a.severity===currentFilter);
-
   if (!filtered.length) {
     document.getElementById('alert-list').innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>No alerts matching this filter.</div>';
     return;
   }
-
   const typeIcons = { fire_proximity:'🔥', red_flag:'🚩', drought_change:'💧', risk_score:'📊', topo_fire:'⛰️' };
-
   document.getElementById('alert-list').innerHTML = filtered.map(a => `
     <div class="alert-card ${a.severity} ${a.acknowledged?'acknowledged':''}" id="alert-${a.id}">
       <div style="padding-top:2px">${typeIcons[a.alert_type]||'⚠️'}</div>
@@ -531,7 +521,6 @@ function renderAlerts() {
         <div class="alert-body">${a.body||''}</div>
         <div class="alert-meta">
           ${a.tiv ? `<div class="alert-meta-item">TIV: <span>$${Math.round(a.tiv/1000)}K</span></div>` : ''}
-          ${a.risk_score ? `<div class="alert-meta-item">Risk score: <span>${a.risk_score}/100</span></div>` : ''}
           ${a.trigger_value ? `<div class="alert-meta-item">Trigger: <span>${a.trigger_value}</span></div>` : ''}
           <div class="alert-meta-item">Time: <span>${timeAgo(a.created_at)}</span></div>
           ${a.acknowledged ? `<div class="alert-meta-item" style="color:#2d6a2d">✓ Acknowledged by <span>${a.acknowledged_by||'unknown'}</span></div>` : ''}
@@ -564,7 +553,32 @@ async function acknowledgeAll() {
 }
 
 async function triggerManualRun() {
-  alert('Automated monitoring runs every 6 hours via Supabase Edge Functions.\n\nTo trigger a manual run, go to your Supabase project → Edge Functions → monitor → Invoke.');
+  alert('Automated monitoring runs every 6 hours via Supabase Edge Functions.\n\nTo trigger a manual run, go to Supabase → Edge Functions → portfolio-sweep → Invoke.');
+}
+
+// ── Google geocoding ───────────────────────────────────────────────────────────
+async function geocodeAddress(address, city, state, zip) {
+  const parts = [address, city, state, zip].filter(Boolean);
+  if (!parts.length) return { lat: null, lng: null, locationType: 'FAILED', formatted: null };
+  const query = parts.join(', ');
+  try {
+    const r = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${GOOGLE_KEY}`
+    );
+    const d = await r.json();
+    if (d.status === 'OK' && d.results?.length) {
+      const result = d.results[0];
+      return {
+        lat: result.geometry.location.lat,
+        lng: result.geometry.location.lng,
+        locationType: result.geometry.location_type, // ROOFTOP, RANGE_INTERPOLATED, GEOMETRIC_CENTER, APPROXIMATE
+        formatted: result.formatted_address,
+      };
+    }
+    return { lat: null, lng: null, locationType: d.status, formatted: null };
+  } catch(e) {
+    return { lat: null, lng: null, locationType: 'ERROR', formatted: null };
+  }
 }
 
 // ── File upload ───────────────────────────────────────────────────────────────
@@ -580,30 +594,30 @@ function processFile(file) {
     const ws = wb.Sheets[wb.SheetNames[0]];
     parsedRows = XLSX.utils.sheet_to_json(ws, { defval:'' });
     if (!parsedRows.length) { alert('No data found in file.'); return; }
-
     detectedColumns = Object.keys(parsedRows[0]);
     showColumnMapper();
-    document.getElementById('upload-zone').querySelector('.upload-zone-text').textContent = `✓ ${file.name} — ${parsedRows.length.toLocaleString()} rows`;
+    document.getElementById('upload-zone').querySelector('.upload-zone-text').textContent =
+      `✓ ${file.name} — ${parsedRows.length.toLocaleString()} rows`;
   };
   reader.readAsArrayBuffer(file);
 }
 
 function showColumnMapper() {
   const required = [
-    { field:'lat', label:'Latitude *', options:['lat','latitude','LAT','Latitude','geocodio_latitude','y','Y'] },
-    { field:'lng', label:'Longitude *', options:['lng','lon','longitude','LON','LNG','Longitude','gecodoio_longitude','geocodio_longitude','x','X'] },
-    { field:'address', label:'Street address', options:['address','Address','street','Street','cleaned addresses','location_address'] },
+    { field:'address', label:'Street address', options:['address','Address','street','location_address','cleaned addresses'] },
     { field:'city', label:'City', options:['city','City','location_city'] },
-    { field:'state', label:'State', options:['state','State','st','ST','location_state'] },
-    { field:'zip', label:'ZIP code', options:['zip','ZIP','zipcode','postal_code','Zip','location_zip'] },
-    { field:'tiv', label:'Total Insured Value', options:['tiv','TIV','total_insured_value','Total Insured Value','insured_value'] },
-    { field:'total_premium', label:'Total premium', options:['total_premium','TotalPremium','Total Premium','premium','Premium'] },
-    { field:'confidence', label:'Location confidence', options:['confidence','Confidence','location_confidence','conf'] },
-    { field:'policy_number', label:'Policy number', options:['policy_number','Policy Number','policy','Policy'] },
-    { field:'tribe', label:'Tribe / Nation', options:['tribe','Tribe','tribal_nation','nation','TribalAffiliation'] },
-    { field:'tribal_region', label:'Tribal region', options:['tribal_region','TribalRegion','Tribal Region','region'] },
-    { field:'cell', label:'Cell / program', options:['cell','Cell','program','Program'] },
-    { field:'location_type', label:'Location type', options:['location_type','Location Type','locationType','geocode_method'] },
+    { field:'state', label:'State', options:['state','State','st','location_state'] },
+    { field:'zip', label:'ZIP code', options:['zip','ZIP','zipcode','location_zip','postal_code'] },
+    { field:'lat', label:'Latitude (CSV fallback)', options:['lat','latitude','LAT','geocodio_latitude'] },
+    { field:'lng', label:'Longitude (CSV fallback)', options:['lng','lon','longitude','gecodoio_longitude','geocodio_longitude'] },
+    { field:'tiv', label:'Total Insured Value', options:['tiv','TIV','total_insured_value','Total Insured Value'] },
+    { field:'total_premium', label:'Total premium', options:['total_premium','TotalPremium','Total Premium','premium'] },
+    { field:'confidence', label:'Location confidence', options:['confidence','Confidence','location_confidence'] },
+    { field:'policy_number', label:'Policy number', options:['policy_number','Policy Number','policy','Policy Status'] },
+    { field:'tribe', label:'Tribe / Nation', options:['tribe','Tribe','TribalAffiliation','tribal_nation'] },
+    { field:'tribal_region', label:'Tribal region', options:['tribal_region','TribalRegion','Tribal Region'] },
+    { field:'cell', label:'Cell / program (TGB/IHBG)', options:['cell','Cell','program','Program'] },
+    { field:'location_type', label:'Location type', options:['location_type','Location Type','geocode_method','address_type'] },
   ];
 
   const html = required.map(r => {
@@ -621,64 +635,154 @@ function showColumnMapper() {
 }
 
 async function uploadPortfolio() {
-  const mapping = ['lat','lng','address','city','state','zip','tiv','total_premium','confidence','policy_number','tribe','tribal_region','cell','location_type']
+  const mapping = ['lat','lng','address','city','state','zip','tiv','total_premium','confidence',
+    'policy_number','tribe','tribal_region','cell','location_type']
     .reduce((acc, f) => { acc[f] = document.getElementById(`map-${f}`)?.value; return acc; }, {});
 
-  if (!mapping.lat || mapping.lat === '(skip)' || !mapping.lng || mapping.lng === '(skip)') {
-    alert('Latitude and longitude columns are required.'); return;
+  const useGoogleGeocode = document.getElementById('geo-google').checked;
+
+  // If geocoding from address, we need at least one address field
+  const hasAddress = mapping.address && mapping.address !== '(skip)';
+  const hasLatLng = mapping.lat && mapping.lat !== '(skip)' && mapping.lng && mapping.lng !== '(skip)';
+
+  if (!useGoogleGeocode && !hasLatLng) {
+    alert('CSV lat/lng mode requires latitude and longitude columns to be mapped.'); return;
+  }
+  if (useGoogleGeocode && !hasAddress) {
+    alert('Google geocoding requires at least the address column to be mapped.'); return;
   }
 
-  const records = parsedRows.map(row => {
-    const out = {};
-    Object.entries(mapping).forEach(([field, col]) => { if (col && col !== '(skip)') out[field] = row[col]; });
-    return out;
-  });
-
-  const mode = document.getElementById('upload-mode').value;
   const status = document.getElementById('upload-status');
   const progressBar = document.getElementById('upload-progress-bar');
   const progressFill = document.getElementById('upload-progress-fill');
+  const geocodeLog = document.getElementById('geocode-log');
 
-  status.textContent = 'Uploading...';
   progressBar.style.display = 'block';
-  progressFill.style.width = '30%';
+  progressFill.style.width = '0%';
 
-  try {
-    // Validate
-    const valid = [], errors = [];
-    records.forEach((r,i) => {
-      const lat = parseFloat(r.lat||r.latitude||r.LAT||r.Latitude);
-      const lng = parseFloat(r.lng||r.lon||r.longitude||r.LNG||r.LON||r.Longitude);
-      if (isNaN(lat)||isNaN(lng)) { errors.push(i+2); return; }
+  // Build base records from CSV
+  const records = parsedRows.map(row => {
+    const out = {};
+    Object.entries(mapping).forEach(([field, col]) => {
+      if (col && col !== '(skip)') out[field] = row[col];
+    });
+    return out;
+  });
+
+  let valid = [];
+
+  if (useGoogleGeocode) {
+    geocodeLog.style.display = 'block';
+    geocodeLog.innerHTML = `Geocoding ${records.length} addresses via Google Maps...<br>`;
+    status.textContent = `Geocoding 0 / ${records.length}...`;
+
+    let geocoded = 0, rooftop = 0, interpolated = 0, failed = 0;
+
+    // Process in batches of 10 with small delay to avoid rate limits
+    const BATCH = 10;
+    for (let i = 0; i < records.length; i += BATCH) {
+      const batch = records.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(async r => {
+        const addr = String(r.address || '').trim();
+        const city  = String(r.city  || '').trim();
+        const state = String(r.state || '').trim();
+        const zip   = String(r.zip   || '').trim();
+        return geocodeAddress(addr, city, state, zip);
+      }));
+
+      results.forEach((geo, j) => {
+        const r = batch[j];
+        geocoded++;
+
+        if (geo.lat && geo.lng) {
+          const locType = geo.locationType || 'UNKNOWN';
+          if (locType === 'ROOFTOP') rooftop++;
+          else if (locType === 'RANGE_INTERPOLATED') interpolated++;
+
+          valid.push({
+            address: String(r.address || '').trim(),
+            city: String(r.city || '').trim(),
+            state: String(r.state || '').trim().toUpperCase().substring(0,2),
+            zip: String(r.zip || '').trim(),
+            lat: geo.lat,
+            lng: geo.lng,
+            location_type: locType,
+            tiv: parseFloat(String(r.tiv||0).replace(/[$,]/g,''))||null,
+            total_premium: parseFloat(String(r.total_premium||0).replace(/[$,]/g,''))||null,
+            confidence: locType === 'ROOFTOP' ? 100 : locType === 'RANGE_INTERPOLATED' ? 75 : locType === 'GEOMETRIC_CENTER' ? 50 : 25,
+            policy_number: String(r.policy_number||'').trim()||null,
+            tribe: String(r.tribe||'').trim()||null,
+            tribal_region: String(r.tribal_region||'').trim()||null,
+            cell: String(r.cell||'').trim()||null,
+          });
+        } else {
+          failed++;
+          const addr = [r.address, r.city, r.state].filter(Boolean).join(', ');
+          geocodeLog.innerHTML += `⚠️ Failed: ${addr} (${geo.locationType})<br>`;
+        }
+      });
+
+      const pct = Math.round(geocoded / records.length * 85); // reserve last 15% for upload
+      progressFill.style.width = pct + '%';
+      status.textContent = `Geocoding ${geocoded} / ${records.length}...`;
+      geocodeLog.innerHTML += `✓ Batch ${Math.ceil(i/BATCH)+1}: ${Math.min(i+BATCH, records.length)} / ${records.length} — ${rooftop} rooftop, ${interpolated} interpolated, ${failed} failed<br>`;
+      geocodeLog.scrollTop = geocodeLog.scrollHeight;
+
+      // Small delay between batches to respect Google rate limits
+      if (i + BATCH < records.length) await new Promise(r => setTimeout(r, 150));
+    }
+
+    geocodeLog.innerHTML += `<br>✓ Geocoding complete: ${valid.length} located, ${failed} failed<br>`;
+
+  } else {
+    // CSV lat/lng mode
+    records.forEach((r, i) => {
+      const lat = parseFloat(r.lat||r.latitude||r.LAT||r.Latitude||0);
+      const lng = parseFloat(r.lng||r.lon||r.longitude||r.LNG||r.LON||r.Longitude||0);
+      if (isNaN(lat)||isNaN(lng)||!lat||!lng) return;
       valid.push({
-        address: String(r.address||r.Address||r['cleaned addresses']||r.location_address||'').trim(),
-        city: String(r.city||r.City||r.location_city||'').trim(),
-        state: String(r.state||r.State||r.location_state||'').trim().toUpperCase().substring(0,2),
-        zip: String(r.zip||r.ZIP||r.zipcode||r.location_zip||'').trim(),
+        address: String(r.address||'').trim(),
+        city: String(r.city||'').trim(),
+        state: String(r.state||'').trim().toUpperCase().substring(0,2),
+        zip: String(r.zip||'').trim(),
         lat, lng,
-        tiv: parseFloat(String(r.tiv||r.TIV||r['Total Insured Value']||0).replace(/[$,]/g,''))||null,
-        total_premium: parseFloat(String(r.total_premium||r.TotalPremium||r['Total Premium']||0).replace(/[$,]/g,''))||null,
-        confidence: parseFloat(r.confidence||r.Confidence||0)||null,
-        policy_number: String(r.policy_number||r['Policy Number']||'').trim()||null,
-        tribe: String(r.tribe||r.Tribe||r.TribalAffiliation||'').trim()||null,
-        tribal_region: String(r.tribal_region||r.TribalRegion||r['Tribal Region']||'').trim()||null,
-        cell: String(r.cell||r.Cell||'').trim()||null,
-        location_type: String(r.location_type||r['Location Type']||r.geocode_method||'').trim()||null,
+        tiv: parseFloat(String(r.tiv||0).replace(/[$,]/g,''))||null,
+        total_premium: parseFloat(String(r.total_premium||0).replace(/[$,]/g,''))||null,
+        confidence: parseFloat(r.confidence||0)||null,
+        policy_number: String(r.policy_number||'').trim()||null,
+        tribe: String(r.tribe||'').trim()||null,
+        tribal_region: String(r.tribal_region||'').trim()||null,
+        cell: String(r.cell||'').trim()||null,
+        location_type: String(r.location_type||'').trim()||null,
       });
     });
-    // If replace mode, delete existing
+  }
+
+  if (!valid.length) { status.textContent = 'No valid records to upload.'; return; }
+
+  const mode = document.getElementById('upload-mode').value;
+  status.textContent = 'Uploading to Supabase...';
+
+  try {
     if (mode === 'replace') {
       await sb('portfolio', { filter:'id=neq.00000000-0000-0000-0000-000000000000', method:'DELETE', prefer:'return=minimal' });
     }
-    // Insert in chunks of 500
+
     const CHUNK = 500;
     let inserted = 0;
-    for (let i=0; i<valid.length; i+=CHUNK) {
+    for (let i = 0; i < valid.length; i += CHUNK) {
       await sb('portfolio', { method:'POST', prefer:'return=minimal', body: valid.slice(i,i+CHUNK) });
-      inserted += Math.min(CHUNK, valid.length-i);
-      progressFill.style.width = Math.round(inserted/valid.length*100)+'%';
+      inserted += Math.min(CHUNK, valid.length - i);
+      const pct = 85 + Math.round(inserted/valid.length*15);
+      progressFill.style.width = pct + '%';
     }
-    status.textContent = `✓ ${inserted.toLocaleString()} properties uploaded${errors.length ? `, ${errors.length} skipped` : ''}.`;
+
+    progressFill.style.width = '100%';
+    const skipped = records.length - valid.length;
+    status.textContent = `✓ ${inserted.toLocaleString()} properties uploaded${skipped ? `, ${skipped} skipped (geocode failed or no coords)` : ''}.`;
+    if (geocodeLog.style.display !== 'none') {
+      geocodeLog.innerHTML += `✓ Upload complete: ${inserted} properties saved to Supabase`;
+    }
     await loadStats();
   } catch(e) {
     status.textContent = `Upload failed: ${e.message}`;
@@ -692,12 +796,10 @@ async function loadPortfolioTable() {
       filter:'order=last_risk_score.desc.nullslast&limit=500',
       select:'address,city,state,tiv,total_premium,confidence,location_type,last_risk_score,tribe,tribal_region,cell'
     });
-
     if (!props?.length) {
       document.getElementById('portfolio-table-wrap').innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>No properties loaded yet.</div>';
       return;
     }
-
     const maxTIV = Math.max(...props.map(p=>p.tiv||0));
     document.getElementById('portfolio-table-wrap').innerHTML = `
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Showing top 500 by risk score</div>
@@ -711,12 +813,13 @@ async function loadPortfolioTable() {
           const confClass = conf >= 85 ? 'conf-high' : conf >= 60 ? 'conf-med' : 'conf-low';
           const riskColor = !p.last_risk_score ? '#ccc' : p.last_risk_score>=75?'var(--critical)':p.last_risk_score>=55?'var(--high)':p.last_risk_score>=35?'var(--moderate)':'var(--low)';
           const tivPct = maxTIV ? Math.round((p.tiv||0)/maxTIV*100) : 0;
+          const cellColor = (p.cell||'').toUpperCase().includes('IHBG') ? '#e07b20' : (p.cell||'').toUpperCase().includes('TGB') ? '#1a6abf' : 'var(--muted)';
           return `<tr>
             <td>${p.address||'—'}${p.city?`, ${p.city}`:''}</td>
             <td>${p.state||'—'}</td>
             <td>${p.tribe||'—'}</td>
             <td style="font-size:10px;color:var(--muted)">${p.tribal_region||'—'}</td>
-            <td style="font-size:10px;color:var(--muted)">${p.cell||'—'}</td>
+            <td><span style="font-size:10px;font-weight:600;color:${cellColor}">${p.cell||'—'}</span></td>
             <td>${p.tiv?'$'+Math.round(p.tiv/1000)+'K':'—'}
               ${p.tiv?`<div class="tiv-bar"><div class="tiv-bar-fill" style="width:${tivPct}%"></div></div>`:''}
             </td>
@@ -728,16 +831,14 @@ async function loadPortfolioTable() {
         }).join('')}</tbody>
       </table>`;
   } catch(e) {
-    document.getElementById('portfolio-table-wrap').innerHTML = '<div class="empty-state">Could not load portfolio. Check Supabase keys in settings.</div>';
+    document.getElementById('portfolio-table-wrap').innerHTML = '<div class="empty-state">Could not load portfolio.</div>';
   }
 }
 
-// ── Moratorium weight sliders ─────────────────────────────────────────────────
+// ── Moratorium weights ────────────────────────────────────────────────────────
 const WEIGHT_IDS = ['fire','drought','pct','tiv','wx','topo'];
 const WEIGHT_DEFAULTS = {fire:25,drought:20,pct:20,tiv:15,wx:12,topo:8};
 const TIER_DEFAULTS = {watch:35,warning:60,mora:80};
-
-// Sample territory values for live preview (fixed inputs, weights change)
 const SAMPLE = {fire:80, drought:75, pct:45, tiv:60, wx:100, topo:70};
 
 function updateWeights() {
@@ -747,24 +848,17 @@ function updateWeights() {
     document.getElementById('wv-'+id).textContent = v + '%';
     total += v;
   });
-
-  // Total indicator — red if not 100
   const totalEl = document.getElementById('weight-total');
   totalEl.textContent = total + '%';
   totalEl.style.color = total === 100 ? 'var(--low)' : total > 100 ? 'var(--critical)' : 'var(--moderate)';
-
-  // Update tier threshold labels
   ['watch','warning','mora'].forEach(t => {
     document.getElementById('tv-'+t).textContent = document.getElementById('t-'+t).value;
   });
-
-  // Enforce tier order
   const watch = parseInt(document.getElementById('t-watch').value);
   const warning = parseInt(document.getElementById('t-warning').value);
   const mora = parseInt(document.getElementById('t-mora').value);
   if (warning <= watch) document.getElementById('t-warning').value = watch + 1;
   if (mora <= warning) document.getElementById('t-mora').value = warning + 1;
-
   renderTierPreview();
   renderMoratoriumPreview();
 }
@@ -795,41 +889,21 @@ function renderMoratoriumPreview() {
   const watch = parseInt(document.getElementById('t-watch').value);
   const warning = parseInt(document.getElementById('t-warning').value);
   const mora = parseInt(document.getElementById('t-mora').value);
-
-  // Calculate score using current weights against sample territory
-  let score = 0;
-  let total = 0;
+  let score = 0, total = 0;
   WEIGHT_IDS.forEach(id => {
     const w = parseInt(document.getElementById('w-'+id).value);
     total += w;
-    score += (SAMPLE[id] || 0) * (w / 100);
+    score += (SAMPLE[id]||0) * (w/100);
   });
-  // Normalize if weights don't sum to 100
-  if (total > 0 && total !== 100) score = score * (100 / total);
+  if (total > 0 && total !== 100) score = score * (100/total);
   score = Math.round(score);
-
   let tier, tierColor, bg, border, action;
-  if (score >= mora) {
-    tier = 'Moratorium recommended';
-    tierColor = '#791F1F'; bg = '#FCEBEB'; border = '#A32D2D';
-    action = 'Suspend all new business and renewals. Notify leadership.';
-  } else if (score >= warning) {
-    tier = 'Warning — restrict new business';
-    tierColor = '#633806'; bg = '#FAEEDA'; border = '#854F0B';
-    action = 'Restrict new submissions. Renewals need senior sign-off.';
-  } else if (score >= watch) {
-    tier = 'Watch — elevated monitoring';
-    tierColor = '#27500A'; bg = '#EAF3DE'; border = '#3B6D11';
-    action = 'Flag new submissions for underwriter review.';
-  } else {
-    tier = 'No action required';
-    tierColor = 'var(--muted)'; bg = 'var(--surface)'; border = 'var(--border)';
-    action = 'Continue routine monitoring.';
-  }
-
+  if (score >= mora) { tier='Moratorium recommended'; tierColor='#791F1F'; bg='#FCEBEB'; border='#A32D2D'; action='Suspend all new business and renewals. Notify leadership.'; }
+  else if (score >= warning) { tier='Warning — restrict new business'; tierColor='#633806'; bg='#FAEEDA'; border='#854F0B'; action='Restrict new submissions. Renewals need senior sign-off.'; }
+  else if (score >= watch) { tier='Watch — elevated monitoring'; tierColor='#27500A'; bg='#EAF3DE'; border='#3B6D11'; action='Flag new submissions for underwriter review.'; }
+  else { tier='No action required'; tierColor='var(--muted)'; bg='var(--surface)'; border='var(--border)'; action='Continue routine monitoring.'; }
   const preview = document.getElementById('mora-preview');
-  preview.style.background = bg;
-  preview.style.borderColor = border;
+  preview.style.background = bg; preview.style.borderColor = border;
   document.getElementById('preview-score').textContent = score;
   document.getElementById('preview-score').style.color = tierColor;
   document.getElementById('preview-tier').textContent = tier;
@@ -838,9 +912,7 @@ function renderMoratoriumPreview() {
 }
 
 function resetWeights() {
-  WEIGHT_IDS.forEach(id => {
-    document.getElementById('w-'+id).value = WEIGHT_DEFAULTS[id];
-  });
+  WEIGHT_IDS.forEach(id => { document.getElementById('w-'+id).value = WEIGHT_DEFAULTS[id]; });
   document.getElementById('t-watch').value = TIER_DEFAULTS.watch;
   document.getElementById('t-warning').value = TIER_DEFAULTS.warning;
   document.getElementById('t-mora').value = TIER_DEFAULTS.mora;
@@ -859,28 +931,22 @@ async function saveMoratoriumWeights() {
   weights.mora_t_watch = parseInt(document.getElementById('t-watch').value);
   weights.mora_t_warning = parseInt(document.getElementById('t-warning').value);
   weights.mora_t_mora = parseInt(document.getElementById('t-mora').value);
-
   const [mcfg] = await sb('alert_config', { filter:'is_global_default=eq.true&limit=1' });
   if (mcfg?.id) await sb('alert_config', { filter:`id=eq.${mcfg.id}`, method:'PATCH', prefer:'return=minimal', body:weights });
   const s = document.getElementById('mora-save-status');
-  s.textContent = '✓ Moratorium model saved';
-  s.style.color = 'var(--low)';
+  s.textContent = '✓ Moratorium model saved'; s.style.color = 'var(--low)';
   setTimeout(() => s.textContent = '', 3000);
 }
 
 function loadMoratoriumWeights(config) {
   if (!config) return;
-  WEIGHT_IDS.forEach(id => {
-    const val = config['mora_w_'+id];
-    if (val !== undefined) document.getElementById('w-'+id).value = val;
-  });
+  WEIGHT_IDS.forEach(id => { const val = config['mora_w_'+id]; if (val !== undefined) document.getElementById('w-'+id).value = val; });
   if (config.mora_t_watch) document.getElementById('t-watch').value = config.mora_t_watch;
   if (config.mora_t_warning) document.getElementById('t-warning').value = config.mora_t_warning;
   if (config.mora_t_mora) document.getElementById('t-mora').value = config.mora_t_mora;
   updateWeights();
 }
 
-// ── Config ────────────────────────────────────────────────────────────────────
 async function loadConfig() {
   try {
     const [[config], recipients, runs] = await Promise.all([
@@ -888,7 +954,6 @@ async function loadConfig() {
       sb('recipients', { filter:'order=created_at.asc' }),
       sb('monitor_runs', { filter:'order=started_at.desc&limit=10' }),
     ]);
-
     if (config) {
       document.getElementById('cfg-fire-miles').value = config.fire_proximity_miles || 25;
       document.getElementById('cfg-risk-threshold').value = config.risk_score_threshold || 65;
@@ -896,15 +961,11 @@ async function loadConfig() {
       document.getElementById('cfg-redflag').checked = config.red_flag_trigger !== false;
       document.getElementById('cfg-topo').checked = config.topo_fire_trigger !== false;
       loadMoratoriumWeights(config);
-    } else {
-      updateWeights(); // init with defaults
-    }
-
+    } else { updateWeights(); }
     if (runs?.length) {
       const last = runs[0];
       document.getElementById('cfg-last-run').textContent = new Date(last.started_at).toLocaleString();
-      const nextRun = new Date(new Date(last.started_at).getTime() + 6*3600000);
-      document.getElementById('cfg-next-run').textContent = nextRun.toLocaleString();
+      document.getElementById('cfg-next-run').textContent = new Date(new Date(last.started_at).getTime() + 6*3600000).toLocaleString();
       document.getElementById('run-log').innerHTML = runs.map(r => `
         <div class="run-log-item">
           <span class="run-status ${r.status}">${r.status}</span>
@@ -915,12 +976,8 @@ async function loadConfig() {
     } else {
       document.getElementById('run-log').innerHTML = '<div style="font-size:12px;color:var(--muted)">No runs yet.</div>';
     }
-
     renderRecipients(recipients || []);
-  } catch(e) {
-    console.warn('Config load failed:', e);
-    updateWeights(); // init sliders even if API fails
-  }
+  } catch(e) { console.warn('Config load failed:', e); updateWeights(); }
 }
 
 async function saveConfig() {
@@ -971,7 +1028,6 @@ async function toggleRecipient(id, active) {
   await sb('recipients', { filter:`id=eq.${id}`, method:'PATCH', prefer:'return=minimal', body:{active} });
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
 loadAlerts();
 </script>
 </body>
