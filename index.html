@@ -288,6 +288,15 @@ footer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--borde
           <div class="legend-item"><div class="legend-dot" style="background:#fff;border:2px solid #1a1814;font-size:10px;display:flex;align-items:center;justify-content:center">↑</div>Wind direction</div>
         </div>
         <div class="legend-divider"></div>
+        <div class="legend-section-title">Insured properties</div>
+        <div class="legend-grid">
+          <div class="legend-item"><div class="legend-dot" style="background:#1a6abf;border-color:#fff;border-width:2px"></div><span style="color:#1a6abf;font-weight:500">TGB</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#e07b20;border-color:#fff;border-width:2px"></div><span style="color:#e07b20;font-weight:500">IHBG</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#8b0000;border-color:#fff;border-width:2px"></div>Critical risk</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2d6a2d;border-color:#fff;border-width:2px"></div>Lower risk</div>
+        </div>
+
+        <div class="legend-divider"></div>
         <div class="legend-section-title">NIFC 7-day fire potential</div>
         <div class="legend-grid">
           <div class="legend-item"><div class="legend-dot" style="background:#f0fff0;border-color:#2d6a2d"></div><span style="color:#2d6a2d;font-weight:500">Normal</span></div>
@@ -425,8 +434,8 @@ function initMap(lat, lng, zoom = 11) {
   if (!map) {
     map = L.map('map').setView([lat, lng], zoom);
 
-    // Google Maps road tiles
-    const basemap = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    // Google Maps road tiles — {s} picks from subdomains array for load balancing
+    const basemap = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       attribution: '&copy; Google Maps',
       maxZoom: 20,
       subdomains: ['mt0','mt1','mt2','mt3']
@@ -454,13 +463,14 @@ function initMap(lat, lng, zoom = 11) {
 function updateLayerControl() {
   if (map._layerControl) map.removeControl(map._layerControl);
   const overlays = {};
-  if (firmsLayer)   overlays['🔥 NASA FIRMS hotspots'] = firmsLayer;
-  if (fireLayer)    overlays['🟠 Fire perimeters (NIFC)'] = fireLayer;
-  if (droughtLayer) overlays['💧 Drought monitor (NDMC)'] = droughtLayer;
-  if (windLayer)    overlays['💨 Wind direction'] = windLayer;
-  if (smokeLayer)    overlays['🌫️ Wildfire smoke (PM2.5)'] = smokeLayer;
-  if (portfolioLayer) overlays['📍 Insured properties'] = portfolioLayer;
-  if (threatLayer)   overlays['⭕ Threat buffer rings'] = threatLayer;
+  if (nationalFireLayer) overlays['🟠 Active fire perimeters'] = nationalFireLayer;
+  if (firmsLayer)        overlays['🛰️ NASA FIRMS hotspots'] = firmsLayer;
+  if (fireLayer)         overlays['🔥 Local fire perimeters'] = fireLayer;
+  if (droughtLayer)      overlays['💧 Drought monitor (NDMC)'] = droughtLayer;
+  if (smokeLayer)        overlays['🌫️ Wildfire smoke (PM2.5)'] = smokeLayer;
+  if (windLayer)         overlays['💨 Wind direction'] = windLayer;
+  if (portfolioLayer)    overlays['📍 Insured properties'] = portfolioLayer;
+  if (threatLayer)       overlays['⭕ Threat buffer rings'] = threatLayer;
   map._layerControl = L.control.layers(
     { 'Google Maps': map._baseMapLayer },
     overlays,
@@ -601,7 +611,7 @@ async function loadPortfolioLayer() {
     console.log('Loading portfolio layer...');
     // Load ALL properties with lat/lng — no radius filter, full portfolio visible at all times
     const res = await fetch(
-      `${SUPA_URL}/rest/v1/portfolio?select=address,city,state,lat,lng,tiv,tribe,last_risk_score,policy_number&limit=5000&order=last_risk_score.desc.nullslast`,
+      `${SUPA_URL}/rest/v1/portfolio?select=address,city,state,lat,lng,tiv,tribe,last_risk_score,policy_number,cell,address_type&limit=5000&order=last_risk_score.desc.nullslast`,
       { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
     );
     if (!res.ok) { console.warn('Portfolio fetch failed:', res.status); return; }
@@ -614,22 +624,51 @@ async function loadPortfolioLayer() {
     props.forEach(p => {
       if (!p.lat || !p.lng) return;
       const score = p.last_risk_score || 0;
-      const color = score >= 75 ? '#8b0000' : score >= 55 ? '#c4420a' : score >= 35 ? '#b07a00' : '#2d6a2d';
-      const size = score >= 75 ? 11 : score >= 55 ? 9 : 7;
+
+      // Color by program type — takes priority over risk score
+      const cell = (p.cell || p.address_type || '').toUpperCase();
+      const isIHBG = cell.includes('IHBG') || cell.includes('HOUSING');
+      const isTGB  = cell.includes('TGB') || cell.includes('TRIBAL') || cell.includes('GOVT');
+
+      let color, borderColor, size, programLabel;
+      if (isIHBG) {
+        // IHBG — tribal housing — orange
+        color = '#e07b20'; borderColor = '#fff'; size = 9;
+        programLabel = 'IHBG';
+      } else if (isTGB) {
+        // TGB — tribal government buildings — blue
+        color = '#1a6abf'; borderColor = '#fff'; size = 9;
+        programLabel = 'TGB';
+      } else {
+        // Unknown / other — color by risk score
+        color = score >= 75 ? '#8b0000' : score >= 55 ? '#c4420a' : score >= 35 ? '#b07a00' : '#2d6a2d';
+        borderColor = '#fff'; size = score >= 75 ? 11 : 7;
+        programLabel = cell || 'Other';
+      }
+
       const icon = L.divIcon({
         className: '',
-        html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid rgba(255,255,255,0.9);border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.5)"></div>`,
+        html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid ${borderColor};border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.5)"></div>`,
         iconSize: [size, size], iconAnchor: [size/2, size/2],
       });
+
       const tiv = p.tiv ? '$' + Math.round(p.tiv/1000).toLocaleString() + 'K' : '—';
       const addr = [p.address, p.city, p.state].filter(Boolean).join(', ');
+      const riskColor = score >= 75 ? '#8b0000' : score >= 55 ? '#c4420a' : score >= 35 ? '#b07a00' : '#2d6a2d';
+
       L.marker([p.lat, p.lng], { icon, zIndexOffset: 500 })
         .bindPopup(`<div style="font-size:12px;min-width:200px">
-          <div style="font-weight:600;margin-bottom:4px;font-size:13px">${addr || 'Unknown address'}</div>
-          <div style="color:#888;margin-bottom:8px;font-size:11px">${p.tribe || '—'}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div style="width:10px;height:10px;background:${color};border-radius:50%;flex-shrink:0"></div>
+            <div style="font-weight:600;font-size:13px">${addr || 'Unknown address'}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+            <span style="font-size:10px;background:${color}22;color:${color};border:1px solid ${color}44;border-radius:10px;padding:1px 7px;font-weight:600">${programLabel}</span>
+            <span style="font-size:11px;color:#888">${p.tribe || '—'}</span>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
             <div><div style="font-size:10px;color:#888">TIV</div><div style="font-weight:500">${tiv}</div></div>
-            <div><div style="font-size:10px;color:#888">Risk</div><div style="font-weight:500;color:${color}">${score || '—'}</div></div>
+            <div><div style="font-size:10px;color:#888">Risk</div><div style="font-weight:500;color:${riskColor}">${score || '—'}</div></div>
             ${p.policy_number ? `<div><div style="font-size:10px;color:#888">Policy</div><div style="font-weight:500;font-size:10px">${p.policy_number}</div></div>` : ''}
           </div>
         </div>`)
@@ -700,20 +739,26 @@ function addThreatBuffers(lat, lng, fireName) {
 // ── NASA FIRMS — GIBS WMTS, maxNativeZoom:9 so tiles stretch at higher zoom ──
 function addFIRMSLayerMercator() {
   if (firmsLayer) { try { map.removeLayer(firmsLayer); } catch(e) {} }
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  if (map._firmsNPP) { try { map.removeLayer(map._firmsNPP); } catch(e) {} }
+
+  // Try last 3 days — GIBS publishes with ~12-24hr delay
+  const dates = [0,1,2].map(d => new Date(Date.now() - d*86400000).toISOString().split('T')[0]);
+
   firmsLayer = L.tileLayer(
-    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Thermal_Anomalies_375m_All/default/${today}/GoogleMapsCompatible/{z}/{y}/{x}.png`,
+    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Thermal_Anomalies_375m_All/default/${dates[0]}/GoogleMapsCompatible/{z}/{y}/{x}.png`,
     { opacity: 1.0, attribution: '🛰️ NASA FIRMS VIIRS NOAA-20', maxNativeZoom: 9, maxZoom: 20,
-      errorTileUrl: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Thermal_Anomalies_375m_All/default/${yesterday}/GoogleMapsCompatible/{z}/{y}/{x}.png` }
+      errorTileUrl: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Thermal_Anomalies_375m_All/default/${dates[1]}/GoogleMapsCompatible/{z}/{y}/{x}.png` }
   );
   const firmsLayer2 = L.tileLayer(
-    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/${today}/GoogleMapsCompatible/{z}/{y}/{x}.png`,
-    { opacity: 0.9, attribution: '🛰️ NASA FIRMS VIIRS S-NPP', maxNativeZoom: 9, maxZoom: 20 }
+    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/${dates[0]}/GoogleMapsCompatible/{z}/{y}/{x}.png`,
+    { opacity: 0.9, attribution: '🛰️ NASA FIRMS VIIRS S-NPP', maxNativeZoom: 9, maxZoom: 20,
+      errorTileUrl: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/${dates[1]}/GoogleMapsCompatible/{z}/{y}/{x}.png` }
   );
+
   firmsLayer.addTo(map);
   firmsLayer2.addTo(map);
   map._firmsNPP = firmsLayer2;
+  console.log('NASA FIRMS layers added for', dates[0]);
 }
 
 // ── Animated wind particles ───────────────────────────────────────────────────
@@ -1002,65 +1047,28 @@ function tagFromText(text) {
 }
 
 async function fetchRedditFeed(lat, lng, state, county, city) {
-  const stateNames = { AZ:'arizona',NM:'newmexico',CA:'California',OR:'oregon',WA:'washington',MT:'montana',SD:'southdakota',OK:'oklahoma',MN:'minnesota',ID:'idaho',CO:'Colorado',UT:'utah',NV:'nevada',WY:'wyoming',TX:'texas',ND:'northdakota',FL:'florida',GA:'georgia',NC:'northcarolina',AK:'alaska',HI:'hawaii',KS:'kansas',NE:'nebraska',LA:'louisiana',MS:'mississippi',AL:'alabama' };
-  const stateSub = stateNames[state] || 'wildfire';
-  const geoTerms = [city&&county?`"${city}" OR "${county}"`:null, city?`"${city}"`:null, county?`"${county}"`:`null`, state?state:null].filter(Boolean);
-  const primaryGeo = geoTerms[0] || state;
-  const searches = [
-    { sub:'wildfire', q:`${primaryGeo} fire OR wildfire OR smoke OR evacuation`, boost:10 },
-    { sub:'wildfire', q:`${county||state} fire OR drought OR burn`, boost:8 },
-    { sub:stateSub, q:`fire OR wildfire OR smoke OR evacuation OR drought`, boost:7 },
-    { sub:'NativeAmerican', q:`${state} fire OR wildfire OR emergency`, boost:6 },
-    { sub:'NativeAmerican', q:`tribal fire OR prescribed burn OR BIA`, boost:5 },
-    { sub:'wildfire', q:`${state} fire 2025`, boost:4 },
-  ].filter(s => s.sub && s.q);
-  const seen = new Set();
-  const items = [];
-  for (const s of searches) {
-    try {
-      const url = `https://www.reddit.com/r/${s.sub}/search.json?q=${encodeURIComponent(s.q)}&sort=new&limit=6&restrict_sr=1&t=month`;
-      const r = await fetch(url, { headers: {'Accept':'application/json'}, signal: AbortSignal.timeout(7000) });
-      if (!r.ok) continue;
-      const d = await r.json();
-      for (const post of (d.data?.children || [])) {
-        const p = post.data;
-        if (!p.title || seen.has(p.id)) continue;
-        seen.add(p.id);
-        const fullText = (p.title + ' ' + (p.selftext||'')).toLowerCase();
-        let relevance = s.boost;
-        if (city && fullText.includes(city.toLowerCase())) relevance += 15;
-        if (county && fullText.includes(county.toLowerCase())) relevance += 10;
-        const ageHours = (Date.now() - p.created_utc*1000) / 3600000;
-        if (ageHours < 6) relevance += 12;
-        else if (ageHours < 24) relevance += 8;
-        else if (ageHours < 72) relevance += 4;
-        items.push({ source:`r/${s.sub}`, sourceUrl:`https://reddit.com/r/${s.sub}`, url:`https://reddit.com${p.permalink}`, title:p.title, text:p.selftext?p.selftext.substring(0,160)+'...':'', time:new Date(p.created_utc*1000).toISOString(), score:p.score, comments:p.num_comments, relevance, geoMatch:city&&fullText.includes(city.toLowerCase())?city:county&&fullText.includes(county.toLowerCase())?county:null });
-      }
-    } catch(e) {}
-  }
-  items.sort((a,b) => b.relevance-a.relevance || new Date(b.time)-new Date(a.time));
-  return items.slice(0,15);
+  return []; // Reddit CORS blocks browser — rendered as search links
 }
 
-function renderReddit(items, state, county, city) {
-  const el = document.getElementById('feed-reddit');
-  document.getElementById('count-reddit').textContent = items.length || '0';
-  if (!items.length) { el.innerHTML = `<div class="feed-empty">No recent wildfire posts found for ${city||county||state}.</div>`; return; }
-  el.innerHTML = items.map(item => {
-    const tag = tagFromText(item.title + ' ' + item.text);
-    const geoChip = item.geoMatch ? `<span style="font-size:9px;background:#e8f4fd;color:#1a5fa8;border-radius:8px;padding:1px 6px;font-weight:500">${item.geoMatch}</span>` : '';
-    return `<div class="social-item"><div class="social-header"><div class="social-source"><a href="${item.sourceUrl}" target="_blank">${item.source}</a> ${geoChip}</div><div class="social-time">${timeAgo(item.time)}</div></div><div class="social-text"><a href="${item.url}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:500">${item.title}</a></div>${item.text?`<div class="social-sub">${item.text}</div>`:''}<span class="social-tag ${tag.cls}">${tag.label}</span></div>`;
-  }).join('');
-}
 
 async function fetchNIFCIncidents(lat, lng) {
   try {
+    // Use NIFC open data — this endpoint allows CORS from browser
     const url = `https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0/query?where=1%3D1&outFields=IncidentName,POOState,FireDiscoveryDateTime,IncidentTypeCategory,DailyAcres,PercentContained,POOCounty&geometry=${lng-8}%2C${lat-8}%2C${lng+8}%2C${lat+8}&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&orderByFields=DailyAcres+DESC&resultRecordCount=20&f=json`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    if (!r.ok) return [];
-    const d = await r.json();
-    return (d.features||[]).map(f => ({ name:f.attributes.IncidentName||'Unknown', state:f.attributes.POOState||'', county:f.attributes.POOCounty||'', type:f.attributes.IncidentTypeCategory||'WF', acres:f.attributes.DailyAcres?Math.round(f.attributes.DailyAcres).toLocaleString():'?', contained:f.attributes.PercentContained!=null?Math.round(f.attributes.PercentContained):null, discovered:f.attributes.FireDiscoveryDateTime?new Date(f.attributes.FireDiscoveryDateTime).toISOString():null }));
-  } catch(e) { return []; }
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 8000));
+    const response = await Promise.race([fetch(url), timeout]);
+    if (!response.ok) return [];
+    const d = await response.json();
+    return (d.features||[]).map(f => ({
+      name: f.attributes.IncidentName||'Unknown',
+      state: f.attributes.POOState||'',
+      county: f.attributes.POOCounty||'',
+      type: f.attributes.IncidentTypeCategory||'WF',
+      acres: f.attributes.DailyAcres ? Math.round(f.attributes.DailyAcres).toLocaleString() : '?',
+      contained: f.attributes.PercentContained != null ? Math.round(f.attributes.PercentContained) : null,
+      discovered: f.attributes.FireDiscoveryDateTime ? new Date(f.attributes.FireDiscoveryDateTime).toISOString() : null,
+    }));
+  } catch(e) { console.warn('NIFC incidents:', e.message); return []; }
 }
 
 function renderNIFC(incidents) {
@@ -1076,42 +1084,23 @@ function renderNIFC(incidents) {
 }
 
 async function fetchRSSFeeds(lat, lng, state) {
-  const feeds = [
-    { name:'FEMA Disaster Declarations', url:'https://www.fema.gov/api/open/v2/disasterDeclarations.rss', icon:'FEMA' },
-    { name:'InciWeb — Active Fires', url:'https://inciweb.wildfire.gov/feeds/rss/incidents/', icon:'InciWeb' },
-    { name:'NWS Fire Weather', url:`https://forecast.weather.gov/MapClick.php?lat=${lat.toFixed(2)}&lon=${lng.toFixed(2)}&unit=0&lg=english&FcstType=feed`, icon:'NWS' },
-  ];
-  const proxy = 'https://api.allorigins.win/get?url=';
-  const items = [];
-  for (const feed of feeds) {
-    try {
-      const r = await fetch(proxy + encodeURIComponent(feed.url), { signal: AbortSignal.timeout(8000) });
-      if (!r.ok) continue;
-      const d = await r.json();
-      const xml = new DOMParser().parseFromString(d.contents, 'text/xml');
-      for (const entry of Array.from(xml.querySelectorAll('item')).slice(0,5)) {
-        const title = entry.querySelector('title')?.textContent || '';
-        const desc = entry.querySelector('description')?.textContent?.replace(/<[^>]*>/g,'').substring(0,160) || '';
-        const link = entry.querySelector('link')?.textContent || '';
-        const pubDate = entry.querySelector('pubDate')?.textContent || '';
-        if (!title) continue;
-        items.push({ source:feed.name, icon:feed.icon, title, desc, link, pubDate:pubDate?new Date(pubDate).toISOString():new Date().toISOString() });
-      }
-    } catch(e) {}
-  }
-  items.sort((a,b) => new Date(b.pubDate)-new Date(a.pubDate));
-  return items.slice(0,15);
+  return []; // allorigins proxy unreliable — rendered as direct links
 }
 
-function renderRSS(items) {
+function renderRSS(items, lat, lng, state) {
   const el = document.getElementById('feed-rss');
-  document.getElementById('count-rss').textContent = items.length || '0';
-  if (!items.length) { el.innerHTML = '<div class="feed-empty">RSS feeds temporarily unavailable. <a href="https://inciweb.wildfire.gov" target="_blank" style="color:var(--accent)">Visit InciWeb &rarr;</a></div>'; return; }
-  el.innerHTML = items.map(item => {
-    const tag = tagFromText(item.title + ' ' + item.desc);
-    return `<div class="social-item"><div class="social-header"><div class="social-source">${item.icon} — ${item.source}</div><div class="social-time">${timeAgo(item.pubDate)}</div></div><div class="social-text">${item.link?`<a href="${item.link}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:500">${item.title}</a>`:item.title}</div>${item.desc?`<div class="social-sub">${item.desc}</div>`:''}<span class="social-tag ${tag.cls}">${tag.label}</span></div>`;
-  }).join('');
+  document.getElementById('count-rss').textContent = '↗';
+  const links = [
+    { name:'InciWeb — Active Incidents', url:'https://inciweb.wildfire.gov/', icon:'🔥' },
+    { name:'NIFC Active Fire Mapping', url:'https://www.nifc.gov/fire-information/active-fire-mapping', icon:'🗺️' },
+    { name:'NWS Fire Weather Forecast', url:`https://forecast.weather.gov/MapClick.php?lat=${lat?lat.toFixed(2):38}&lon=${lng?lng.toFixed(2):-105}&unit=0&lg=english&FcstType=text`, icon:'🌤️' },
+    { name:'FEMA Disaster Declarations', url:'https://www.fema.gov/disaster/declarations', icon:'🏛️' },
+    { name:'EPA AirNow Fire & Smoke Map', url:'https://fire.airnow.gov/', icon:'🌫️' },
+  ];
+  el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Authoritative sources — open directly for live intelligence:</div>
+    ${links.map(l=>`<div class="social-item"><div class="social-text">${l.icon} <a href="${l.url}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500">${l.name} →</a></div></div>`).join('')}`;
 }
+
 
 function renderXTab(lat, lng, state, accounts) {
   const el = document.getElementById('feed-x');
@@ -1149,7 +1138,7 @@ async function fetchAndRenderSocialFeeds(lat, lng, state, county, city) {
   const [redditItems, nifcItems, rssItems] = await Promise.all([fetchRedditFeed(lat, lng, state, county, city), fetchNIFCIncidents(lat, lng), fetchRSSFeeds(lat, lng, state)]);
   renderReddit(redditItems, state, county, city);
   renderNIFC(nifcItems);
-  renderRSS(rssItems);
+  renderRSS(rssItems, lat, lng, state);
 }
 
 // ── Wildfire Smoke / PM2.5 — EPA AirNow ──────────────────────────────────────
