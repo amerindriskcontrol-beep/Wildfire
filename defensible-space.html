@@ -1064,10 +1064,8 @@ async function enrichWithOpenAI(baseResult, ctx, apiKey) {
     ? `${droughtData.label} (D${droughtData.dm}). Precip deficit: ${droughtData.precipDeficit}%. Soil moisture: ${droughtData.soilMoisture}%. VPD: ${droughtData.vpd} kPa.`
     : 'No drought data.';
 
-  const baseFindings = baseResult.keyFindings.map(f => `[${f.priority}] ${f.finding}`).join('
-');
-  const baseRecs = baseResult.recommendations.map(r => `[${r.priority}] ${r.action}`).join('
-');
+  const baseFindings = baseResult.keyFindings.map(f => `[${f.priority}] ${f.finding}`).join('\n');
+  const baseRecs = baseResult.recommendations.map(r => `[${r.priority}] ${r.action}`).join('\n');
 
   const prompt = `You are a wildfire risk control expert writing a defensible space audit report for AMERIND Risk, a tribally owned insurance carrier specializing in Tribal housing authorities, casino resorts, and governmental buildings.
 
