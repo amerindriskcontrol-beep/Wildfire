@@ -1790,22 +1790,26 @@ function exportPDF() {
   }
 
   // ── Drought block ─────────────────────────────────────────────────────────
-  if (droughtData) {
+    if (droughtData) {
     y += 4;
     y = sectionHeader('DROUGHT CONDITIONS — WILDFIRE RISK AMPLIFIER', y);
     const drgb = droughtData.dm>=3?CRIT:droughtData.dm>=2?HIGH:droughtData.dm>=1?MOD:LOW;
-    const droughtLines = doc.splitTextToSize(r.droughtNote||'', CW-110);
-    const dH = Math.max(32, droughtLines.length*10+18);
+    const droughtLines = doc.splitTextToSize(r.droughtNote||'', CW-16);
+    const statsLine = `Precip deficit: ${droughtData.precipDeficit}%   Soil moisture: ${droughtData.soilMoisture}%   Water balance: ${droughtData.waterBalance}mm   VPD: ${droughtData.vpd}kPa`;
+    const dH = 20 + droughtLines.length*10 + 14; // title + lines + stats + padding
     doc.setFillColor(...LIGHT); doc.roundedRect(M,y,CW,dH,4,4,'F');
+    doc.setFillColor(...drgb); doc.roundedRect(M,y,4,dH,2,2,'F');
+    // Drought label
     doc.setTextColor(...drgb); doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.text((droughtData.dm>=0?'D'+droughtData.dm+' — ':'')+droughtData.label, M+10, y+14);
+    doc.text((droughtData.dm>=0?'D'+droughtData.dm+' — ':'')+droughtData.label, M+12, y+14);
+    // Narrative — full wrap
     doc.setTextColor(...MUTED); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
-    droughtLines.forEach((l,i) => doc.text(l, M+10, y+25+i*10));
-    // Stats row
-    const statsY = y+dH-8;
-    doc.setFontSize(7);
-    doc.text(`Precip deficit: ${droughtData.precipDeficit}%   Soil moisture: ${droughtData.soilMoisture}%   Water balance: ${droughtData.waterBalance}mm   VPD: ${droughtData.vpd}kPa`, M+10, statsY);
-    y += dH+8;
+    droughtLines.forEach((l,i) => doc.text(l, M+12, y+24+i*10));
+    // Stats row below narrative
+    const statsY = y+24+droughtLines.length*10+4;
+    doc.setFontSize(7); doc.setTextColor(100,96,92);
+    doc.text(statsLine, M+12, statsY);
+    y += dH+10;
   }
 
   // ── Zone breakdown ────────────────────────────────────────────────────────
@@ -1814,28 +1818,37 @@ function exportPDF() {
 
   r.zones.forEach(z => {
     const zrgb = z.score>=70?CRIT:z.score>=45?MOD:LOW;
-    const findLines = doc.splitTextToSize(z.findings||'', CW-58);
-    const zH = Math.max(44, findLines.length*9+20);
-    y = checkPage(y, zH+6, doc);
+    // Wrap text to avoid score badge on right (badge is 38pt wide + 8pt margin)
+    const textW = CW - 56;
+    const findLines = doc.splitTextToSize(z.findings||'', textW);
+    // Height: 16 (title) + 10 (status) + findings lines*9 + 10 (bar+padding)
+    const zH = Math.max(50, 36 + findLines.length*9 + 10);
+    y = checkPage(y, zH+8, doc);
 
     doc.setFillColor(...LIGHT); doc.roundedRect(M,y,CW,zH,4,4,'F');
-    // Score badge
-    doc.setFillColor(...zrgb); doc.roundedRect(W-M-38,y+8,30,20,3,3,'F');
-    doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.text(String(z.score), W-M-23, y+22, {align:'center'});
+    doc.setFillColor(...zrgb); doc.roundedRect(M,y,4,zH,2,2,'F');
+
+    // Score badge — top right
+    doc.setFillColor(...zrgb); doc.roundedRect(W-M-40,y+8,32,22,3,3,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(12); doc.setFont('helvetica','bold');
+    doc.text(String(z.score), W-M-24, y+23, {align:'center'});
+
     // Zone title
     doc.setTextColor(...DARK); doc.setFontSize(10); doc.setFont('helvetica','bold');
-    doc.text(`${z.zone}  (${z.range})`, M+8, y+15);
-    // Status tag
-    doc.setFontSize(7); doc.setTextColor(...zrgb);
-    doc.text(z.status.toUpperCase(), M+8, y+24);
-    // Findings text — full wrap
+    doc.text(`${z.zone}  (${z.range})`, M+12, y+14);
+
+    // Status
+    doc.setFontSize(6.5); doc.setTextColor(...zrgb); doc.setFont('helvetica','bold');
+    doc.text(z.status.toUpperCase(), M+12, y+23);
+
+    // Findings — start below title/status block
     doc.setTextColor(...MUTED); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
-    findLines.forEach((l,i) => doc.text(l, M+8, y+33+i*9));
-    // Progress bar
-    const barY = y+zH-6;
-    doc.setFillColor(220,215,208); doc.roundedRect(M+8,barY,CW-48,3,1,1,'F');
-    doc.setFillColor(...zrgb); doc.roundedRect(M+8,barY,Math.round((CW-48)*z.score/100),3,1,1,'F');
+    findLines.forEach((l,i) => doc.text(l, M+12, y+33+i*9));
+
+    // Progress bar at bottom
+    const barY = y+zH-7;
+    doc.setFillColor(220,215,208); doc.roundedRect(M+12,barY,CW-24,3,1,1,'F');
+    doc.setFillColor(...zrgb); doc.roundedRect(M+12,barY,Math.round((CW-24)*z.score/100),3,1,1,'F');
     y += zH+8;
   });
 
