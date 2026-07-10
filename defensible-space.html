@@ -101,6 +101,7 @@ header{background:var(--text);color:#fff;padding:14px 32px;display:flex;align-it
 .disclaimer{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px;margin-bottom:18px;font-size:12px;color:var(--muted);line-height:1.7;}
 .export-row{display:flex;gap:10px;}
 .pac-container{font-family:var(--sans);font-size:14px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,0.1);}
+.ai-badge{display:inline-flex;align-items:center;gap:5px;background:#e8eef8;border:1px solid #2e75b6;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:600;color:#003882;margin-left:8px;}
 /* Scan mode toggle */
 .mode-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px;}
 .mode-btn{flex:1;padding:8px 10px;font-size:12px;font-weight:500;border:none;background:var(--bg);color:var(--muted);cursor:pointer;transition:all 0.15s;font-family:var(--sans);}
@@ -266,6 +267,16 @@ header{background:var(--text);color:#fff;padding:14px 32px;display:flex;align-it
         </div>
         <div class="field-group">
           <label class="field-label" style="display:flex;align-items:center;justify-content:space-between">
+            <span>OpenAI API key <span style="font-size:10px;color:var(--muted);font-weight:400">(optional — enables tailored narrative)</span></span>
+            <a href="https://platform.openai.com/api-keys" target="_blank" style="font-size:10px;color:#003882;text-decoration:none">Get key ↗</a>
+          </label>
+          <input class="field-input" type="password" id="openai-key" placeholder="sk-... (stored in browser only, never sent to our servers)" oninput="saveKey()"/>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5">
+            When provided, GPT-4o mini generates location-specific findings referencing detected vegetation, terrain, and fuel conditions. Without a key, the RC language library is used.
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label" style="display:flex;align-items:center;justify-content:space-between">
             <span>Imagery date</span>
             <a id="earth-link" href="#" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none;display:none">Verify in Google Earth ↗</a>
           </label>
@@ -344,7 +355,23 @@ let currentResult = null, droughtData = null, fuelData = null;
 let scanMode = 'single'; // 'single' | 'campus'
 let campusMarkers = [], campusPolygon = null, campusBuffers = [];
 
+// ── OpenAI key persistence ────────────────────────────────────────────────────
+function loadSavedKey() {
+  try {
+    const saved = localStorage.getItem('amerind_openai_key');
+    if (saved) document.getElementById('openai-key').value = saved;
+  } catch(e) {}
+}
+function saveKey() {
+  try {
+    const k = document.getElementById('openai-key').value.trim();
+    if (k) localStorage.setItem('amerind_openai_key', k);
+    else localStorage.removeItem('amerind_openai_key');
+  } catch(e) {}
+}
+
 function initMaps() {
+  loadSavedKey();
   map = new google.maps.Map(document.getElementById('satellite-map'), {
     center: { lat: 44, lng: -108 }, zoom: 5,
     mapTypeId: 'satellite', tilt: 0,
@@ -980,8 +1007,28 @@ async function runAudit() {
 
 
   try {
-    // Generate audit from Vision labels + RC language library — no external AI call needed
+    // Step 1: Generate baseline audit from Vision + RC language library
     const result = generateAuditFromVision(visionScore, visionLabels, visionObjects, droughtData, z1, z2, z3, type);
+
+    const openaiKey = document.getElementById('openai-key').value.trim();
+
+    // Step 2: If OpenAI key provided, enrich with location-specific AI narrative
+    if (openaiKey) {
+      setStatus('Vision analysis complete — generating location-specific narrative...', true);
+      try {
+        const enriched = await enrichWithOpenAI(result, {
+          address, tribe, type, z1, z2, z3,
+          visionLabels, visionScore, droughtData, fuelData,
+          lat: auditLat, lng: auditLng,
+          scanMode: isCampus ? 'campus' : 'single',
+        }, openaiKey);
+        if (enriched) Object.assign(result, enriched);
+        result._aiEnriched = true;
+      } catch(aiErr) {
+        console.warn('OpenAI enrichment failed, using language library:', aiErr.message);
+        result._aiEnriched = false;
+      }
+    }
 
     currentResult = {
       result, address, tribe, type, auditor, imageDate, z1, z2, z3,
@@ -992,12 +1039,118 @@ async function runAudit() {
       visionLabels: visionLabels.slice(0, 8),
     };
     renderResults(result, address, tribe, auditor);
-    setStatus('Audit complete — Google Vision analysis + RC language library applied.');
+    const aiLabel = result._aiEnriched ? ' <span class="ai-badge">✦ AI narrative</span>' : '';
+    document.getElementById('status-text').innerHTML = 'Audit complete — Google Vision analysis applied.' + aiLabel;
   } catch(e) {
     setStatus('Error: ' + e.message);
     console.error(e);
   }
   document.getElementById('audit-btn').disabled = false;
+}
+
+// ── OpenAI enrichment ─────────────────────────────────────────────────────────
+async function enrichWithOpenAI(baseResult, ctx, apiKey) {
+  const { address, tribe, type, z1, z2, z3, visionLabels, visionScore, droughtData, fuelData, lat, lng, scanMode } = ctx;
+
+  const typeLabels = {housing:'Tribal housing authority (IHBG)',government:'Tribal government building cluster (TGB)',casino:'Casino / resort campus',industrial:'Industrial / utility facility',mixed:'Mixed use campus'};
+
+  const visionSummary = visionLabels.slice(0,12).map(l => `${l.description} (${Math.round(l.score)}%)`).join(', ');
+
+  const fuelSummary = fuelData
+    ? `Dead fuel moisture: 1-hr ${fuelData.fm1hr}% (${fuelData.fm1Rating.label}), 10-hr ${fuelData.fm10hr}%, 100-hr ${fuelData.fm100hr}%. ERC: ${fuelData.erc} (${fuelData.ercRating.label}). KBDI: ${fuelData.kbdi}/800 (${fuelData.kbdiRating.label}). FFWI: ${fuelData.ffwi}. Live grass FM: ${fuelData.liveGrassMoisture}% (${fuelData.liveGrassMoisture<=60?'cured':'transitioning'}). Avg temp: ${fuelData.avgTempF}°F. Avg afternoon RH: ${fuelData.avgAfternoonRH}%.`
+    : 'Fuel condition data unavailable.';
+
+  const droughtSummary = droughtData
+    ? `${droughtData.label} (D${droughtData.dm}). Precip deficit: ${droughtData.precipDeficit}%. Soil moisture: ${droughtData.soilMoisture}%. VPD: ${droughtData.vpd} kPa.`
+    : 'No drought data.';
+
+  const baseFindings = baseResult.keyFindings.map(f => `[${f.priority}] ${f.finding}`).join('
+');
+  const baseRecs = baseResult.recommendations.map(r => `[${r.priority}] ${r.action}`).join('
+');
+
+  const prompt = `You are a wildfire risk control expert writing a defensible space audit report for AMERIND Risk, a tribally owned insurance carrier specializing in Tribal housing authorities, casino resorts, and governmental buildings.
+
+PROPERTY CONTEXT:
+- Location: ${address || `${lat?.toFixed(4)}, ${lng?.toFixed(4)}`}
+- Tribal Nation: ${tribe || 'Not specified'}
+- Property type: ${typeLabels[type] || type}
+- Scan mode: ${scanMode === 'campus' ? 'Campus polygon — zones buffer from cluster perimeter' : 'Single structure'}
+- Defensible space zones: Zone 1 (0–${z1}ft), Zone 2 (${z1}–${z2}ft), Zone 3 (${z2}–${z3}ft)
+- Audit standard: NFPA 1144 / CAL FIRE / IBHS
+
+GOOGLE VISION AI ANALYSIS (from current satellite imagery):
+Detected labels: ${visionSummary}
+Zone scores: Zone 1: ${visionScore.z1}/100, Zone 2: ${visionScore.z2}/100, Zone 3: ${visionScore.z3}/100
+Vegetation intensity: ${visionScore.vegScore}% | Cleared/bare: ${visionScore.clearedScore}%
+Green color fraction: ${visionScore.greenFraction.toFixed(1)}% | Dry/brown fraction: ${visionScore.brownFraction.toFixed(1)}%
+
+CURRENT SEASON FUEL CONDITIONS:
+${fuelSummary}
+
+DROUGHT CONDITIONS:
+${droughtSummary}
+
+BASELINE FINDINGS (from RC language library — use as starting point, enrich with location specificity):
+${baseFindings}
+
+BASELINE RECOMMENDATIONS (enrich with location specificity):
+${baseRecs}
+
+INSTRUCTIONS:
+Rewrite the findings and recommendations to be specific to this location, property type, and Tribal Nation. Reference:
+- The specific vegetation types detected (e.g., saguaro, palo verde, sagebrush, ponderosa pine, prairie grass — infer from location and Vision labels)
+- The actual fuel conditions (reference ERC, KBDI, 1-hr FM values directly)
+- The specific property type and how it affects risk (casino with high occupancy vs. housing cluster with resident exposure)
+- Regional fire history and typical fire behavior for this area
+- BIA and tribal coordination pathways relevant to this Nation
+- NFPA 1144 section references where applicable
+
+Capitalize Tribal, Tribe, Indigenous, Native, and Sovereignty. Do not use contractions in formal findings. Use precise RC language.
+
+Return ONLY valid JSON with this exact structure — no other text, no markdown:
+{
+  "droughtNote": "<2-3 sentences specific to this location and drought severity>",
+  "zones": [
+    {"zone":"Zone 1","range":"0–${z1} feet","score":${baseResult.zones[0]?.score},"status":"${baseResult.zones[0]?.status}","findings":"<3-4 sentences specific to this location and detected vegetation>","priority":"${baseResult.zones[0]?.priority}"},
+    {"zone":"Zone 2","range":"${z1}–${z2} feet","score":${baseResult.zones[1]?.score},"status":"${baseResult.zones[1]?.status}","findings":"<3-4 sentences specific to this location>","priority":"${baseResult.zones[1]?.priority}"},
+    {"zone":"Zone 3","range":"${z2}–${z3} feet","score":${baseResult.zones[2]?.score},"status":"${baseResult.zones[2]?.status}","findings":"<3-4 sentences specific to this location>","priority":"${baseResult.zones[2]?.priority}"}
+  ],
+  "keyFindings": [
+    {"priority":"<Critical|High|Moderate|Low>","finding":"<location-specific observation>","detail":"<specific fire risk detail referencing fuel conditions and location>"}
+  ],
+  "recommendations": [
+    {"priority":"<Critical|High|Moderate|Low>","action":"<specific action with location context>","rationale":"<rationale referencing fuel indices, drought level, and property type>"}
+  ],
+  "siteVisitRecommended": ${baseResult.siteVisitRecommended},
+  "siteVisitReason": ${JSON.stringify(baseResult.siteVisitReason)}
+}
+
+Provide 5–7 findings and 5–7 recommendations. Keep overall scores and compliance labels from the baseline — only enrich the narrative text.`;
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      temperature: 0.3,
+      max_tokens: 2000,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`OpenAI ${res.status}: ${err.error?.message || 'API error'}`);
+  }
+
+  const data = await res.json();
+  const raw = data.choices?.[0]?.message?.content || '';
+  return JSON.parse(raw.replace(/```json|```/g, '').trim());
 }
 
 // ── Score Vision API results into zone estimates ───────────────────────────
@@ -1525,6 +1678,7 @@ function clearAudit() {
   document.getElementById('area-search').value='';
   document.getElementById('image-date').value='';
   document.getElementById('image-date').style.borderColor='';
+  // Note: preserve OpenAI key across clears
   document.getElementById('earth-link').style.display='none';
   document.getElementById('image-date-note').innerHTML='Date auto-detected from satellite layer when available. Verify in Google Earth for exact capture date.';
   zoneCircles.forEach(c=>c.setMap(null)); zoneCircles=[];
@@ -1544,150 +1698,346 @@ function setStatus(msg, loading=false) {
 function exportPDF() {
   if (!currentResult) return;
   const {jsPDF} = window.jspdf;
-  const doc = new jsPDF({unit:'pt',format:'letter'});
-  const {result:r,address,tribe,auditor,z1,z2,z3,timestamp} = currentResult;
-  const W=612,M=48,CW=W-M*2;
-  doc.setFillColor(26,24,20); doc.rect(0,0,W,56,'F');
-  doc.setFillColor(196,66,10); doc.rect(0,0,5,56,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(15); doc.setFont('helvetica','bold'); doc.text('AMERIND Risk',M,24);
-  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.text('Defensible Space Audit Report — NFPA 1144 / CAL FIRE',M,38);
-  doc.setTextColor(160,150,140); doc.setFontSize(8); doc.text(timestamp.toLocaleString(),W-M,38,{align:'right'});
-  const sc2 = r.overallScore>=70?[30,100,30]:r.overallScore>=45?[120,80,0]:[139,0,0];
-  let y=68;
-  doc.setFillColor(...sc2); doc.roundedRect(M,y,CW,60,6,6,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(40); doc.setFont('helvetica','bold'); doc.text(String(r.overallScore),M+16,y+44);
-  doc.setFontSize(18); doc.setFont('helvetica','normal'); doc.text(r.overallLabel+' — Defensible Space',M+78,y+26);
-  doc.setFontSize(10); doc.text([address,tribe].filter(Boolean).join(' · '),M+78,y+42);
-  doc.setFontSize(8); doc.text(`Auditor: ${auditor} · ${currentResult.scanMode==='campus'?'Campus polygon mode':'Single structure mode'}`,M+78,y+50);
-  doc.text(`Zones: 0–${z1}ft / ${z1}–${z2}ft / ${z2}–${z3}ft · Imagery: ${currentResult.imageDate||'Unknown'} · ${timestamp.toLocaleDateString()}`,M+78,y+60);
-  y+=72;
-  doc.setFillColor(220,215,208); doc.roundedRect(M,y,CW,6,3,3,'F');
-  doc.setFillColor(...sc2); doc.roundedRect(M,y,Math.round(CW*r.overallScore/100),6,3,3,'F');
-  y+=14;
-  if(r.imageNote){doc.setFillColor(255,250,240);doc.roundedRect(M,y,CW,20,3,3,'F');doc.setTextColor(120,90,0);doc.setFontSize(8);doc.text('⚠ '+r.imageNote.substring(0,130),M+8,y+13);y+=26;}
-  if(droughtData){
-    y+=4;
-    doc.setTextColor(100,96,92);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('DROUGHT CONDITIONS — RISK AMPLIFIER',M,y);
-    doc.setDrawColor(210,205,198);doc.line(M,y+4,W-M,y+4);y+=12;
-    doc.setFillColor(248,246,242);doc.roundedRect(M,y,CW,32,4,4,'F');
-    doc.setTextColor(26,24,20);doc.setFontSize(11);doc.setFont('helvetica','bold');doc.text((droughtData.dm>=0?'D'+droughtData.dm+' — ':'')+droughtData.label,M+10,y+14);
-    doc.setTextColor(120,115,108);doc.setFontSize(8);doc.setFont('helvetica','normal');
-    doc.text(r.droughtNote?.substring(0,140)||'',M+10,y+26);
-    doc.text(`Precip deficit: ${droughtData.precipDeficit}%  Soil moisture: ${droughtData.soilMoisture}%  Water balance: ${droughtData.waterBalance}mm  VPD: ${droughtData.vpd}kPa`,M+10,y+32);
-    y+=40;
+  const doc = new jsPDF({unit:'pt', format:'letter'});
+  const {result:r, address, tribe, auditor, z1, z2, z3, timestamp} = currentResult;
+
+  // ── Constants ─────────────────────────────────────────────────────────────
+  const W=612, M=44, CW=W-M*2;
+  const NAVY=[0,56,130], BLUE=[46,117,182];
+  const CRIT=[139,0,0], HIGH=[196,66,10], MOD=[176,122,0], LOW=[45,106,45];
+  const MUTED=[120,115,108], DARK=[26,24,20], LIGHT=[248,246,242];
+  const sc2 = r.overallScore>=70?CRIT:r.overallScore>=45?MOD:LOW;
+
+  // ── Helper: color from hex string ─────────────────────────────────────────
+  function hexRgb(h){h=h.replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+  function priorityRgb(p){return p==='Critical'?CRIT:p==='High'?HIGH:p==='Moderate'?MOD:LOW;}
+
+  // ── Helper: section header ─────────────────────────────────────────────────
+  function sectionHeader(label, y) {
+    doc.setTextColor(...NAVY); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+    doc.text(label, M, y);
+    doc.setDrawColor(...BLUE); doc.setLineWidth(0.75); doc.line(M, y+3, W-M, y+3);
+    doc.setLineWidth(0.5); doc.setDrawColor(210,205,198);
+    return y+13;
   }
-  y+=4;
-  doc.setTextColor(100,96,92);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('ZONE-BY-ZONE BREAKDOWN',M,y);
-  doc.setDrawColor(210,205,198);doc.line(M,y+4,W-M,y+4);y+=12;
-  r.zones.forEach(z=>{
-    const zc=z.score>=70?[30,100,30]:z.score>=45?[120,80,0]:[139,0,0];
-    doc.setFillColor(248,246,242);doc.roundedRect(M,y,CW,46,4,4,'F');
-    doc.setFillColor(...zc);doc.roundedRect(W-M-34,y+8,28,18,3,3,'F');
-    doc.setTextColor(255,255,255);doc.setFontSize(11);doc.setFont('helvetica','bold');doc.text(String(z.score),W-M-20,y+21,{align:'center'});
-    doc.setTextColor(26,24,20);doc.setFontSize(11);doc.setFont('helvetica','bold');doc.text(`${z.zone} (${z.range})`,M+8,y+16);
-    doc.setTextColor(120,115,108);doc.setFontSize(8);doc.setFont('helvetica','normal');
-    const lines=doc.splitTextToSize(z.findings,CW-48);
-    doc.text(lines[0]||'',M+8,y+27);if(lines[1])doc.text(lines[1],M+8,y+37);
-    doc.setFillColor(220,215,208);doc.roundedRect(M+8,y+40,CW-48,3,1,1,'F');
-    doc.setFillColor(...zc);doc.roundedRect(M+8,y+40,Math.round((CW-48)*z.score/100),3,1,1,'F');
-    y+=52;
-  });
-  y+=4;
-  doc.setTextColor(100,96,92);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('RECOMMENDED ACTIONS',M,y);
-  doc.line(M,y+4,W-M,y+4);y+=12;
-  r.recommendations.forEach(rec=>{
-    if(y>700){doc.addPage();y=48;}
-    const pc2=rec.priority==='Critical'?[139,0,0]:rec.priority==='High'?[196,66,10]:rec.priority==='Moderate'?[176,122,0]:[45,106,45];
-    doc.setFillColor(...pc2);doc.roundedRect(M,y+2,52,12,3,3,'F');
-    doc.setTextColor(255,255,255);doc.setFontSize(7);doc.setFont('helvetica','bold');doc.text(rec.priority.toUpperCase(),M+26,y+11,{align:'center'});
-    doc.setTextColor(26,24,20);doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text(rec.action.substring(0,80),M+60,y+10);
-    doc.setTextColor(120,115,108);doc.setFontSize(8);doc.setFont('helvetica','normal');doc.text(rec.rationale.substring(0,100),M+60,y+21);
-    y+=30;
+
+  // ── Helper: page check + new page ─────────────────────────────────────────
+  function checkPage(y, needed, doc) {
+    if (y + needed > 730) { doc.addPage(); addPageHeader(doc); return 60; }
+    return y;
+  }
+
+  function addPageHeader(doc) {
+    doc.setFillColor(...DARK); doc.rect(0,0,W,34,'F');
+    doc.setFillColor(0,56,130); doc.rect(0,0,4,34,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text('AMERIND Risk — Defensible Space Audit', M, 20);
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(160,150,140);
+    doc.text(`${address||''} · ${timestamp.toLocaleDateString()}`, M, 29);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PAGE 1 — Score + Zones + Findings + Recommendations
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ── Header bar ────────────────────────────────────────────────────────────
+  doc.setFillColor(...DARK); doc.rect(0,0,W,50,'F');
+  doc.setFillColor(...NAVY); doc.rect(0,0,4,50,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.text('AMERIND Risk',M,22);
+  doc.setFontSize(8.5); doc.setFont('helvetica','normal');
+  doc.text('Defensible Space Audit Report — NFPA 1144 / CAL FIRE / IBHS',M,36);
+  doc.setTextColor(160,150,140); doc.setFontSize(7.5);
+  doc.text(timestamp.toLocaleString(), W-M, 36, {align:'right'});
+
+  let y = 58;
+
+  // ── Score banner ──────────────────────────────────────────────────────────
+  doc.setFillColor(...sc2); doc.roundedRect(M,y,CW,68,5,5,'F');
+  doc.setTextColor(255,255,255);
+
+  // Score number
+  doc.setFontSize(46); doc.setFont('helvetica','bold');
+  doc.text(String(r.overallScore), M+14, y+50);
+
+  // Label + address — use splitTextToSize for safety
+  const labelX = M+82;
+  doc.setFontSize(17); doc.setFont('helvetica','bold');
+  doc.text(r.overallLabel+' — Defensible Space', labelX, y+22);
+
+  const addrText = [address, tribe].filter(Boolean).join(' · ');
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  const addrLines = doc.splitTextToSize(addrText, CW-90);
+  doc.text(addrLines[0]||'', labelX, y+35);
+
+  doc.setFontSize(7.5);
+  doc.text(`Scan mode: ${currentResult.scanMode==='campus'?'Campus polygon':'Single structure'}  ·  Zones: 0–${z1}ft / ${z1}–${z2}ft / ${z2}–${z3}ft`, labelX, y+47);
+  doc.text(`Imagery: ${currentResult.imageDate||'Unknown'}  ·  Auditor: ${auditor}`, labelX, y+57);
+
+  y += 75;
+
+  // Score progress bar
+  doc.setFillColor(220,215,208); doc.roundedRect(M,y,CW,5,2,2,'F');
+  doc.setFillColor(...sc2); doc.roundedRect(M,y,Math.round(CW*r.overallScore/100),5,2,2,'F');
+  y += 13;
+
+  // ── Image / caveat note ────────────────────────────────────────────────────
+  if (r.imageNote) {
+    const noteLines = doc.splitTextToSize('Note: '+r.imageNote, CW-16);
+    const noteH = noteLines.length*10+8;
+    doc.setFillColor(255,250,235); doc.roundedRect(M,y,CW,noteH,3,3,'F');
+    doc.setTextColor(120,90,0); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    noteLines.forEach((l,i) => doc.text(l, M+8, y+10+i*10));
+    y += noteH + 6;
+  }
+
+  // ── Drought block ─────────────────────────────────────────────────────────
+  if (droughtData) {
+    y += 4;
+    y = sectionHeader('DROUGHT CONDITIONS — WILDFIRE RISK AMPLIFIER', y);
+    const drgb = droughtData.dm>=3?CRIT:droughtData.dm>=2?HIGH:droughtData.dm>=1?MOD:LOW;
+    const droughtLines = doc.splitTextToSize(r.droughtNote||'', CW-110);
+    const dH = Math.max(32, droughtLines.length*10+18);
+    doc.setFillColor(...LIGHT); doc.roundedRect(M,y,CW,dH,4,4,'F');
+    doc.setTextColor(...drgb); doc.setFontSize(11); doc.setFont('helvetica','bold');
+    doc.text((droughtData.dm>=0?'D'+droughtData.dm+' — ':'')+droughtData.label, M+10, y+14);
+    doc.setTextColor(...MUTED); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    droughtLines.forEach((l,i) => doc.text(l, M+10, y+25+i*10));
+    // Stats row
+    const statsY = y+dH-8;
+    doc.setFontSize(7);
+    doc.text(`Precip deficit: ${droughtData.precipDeficit}%   Soil moisture: ${droughtData.soilMoisture}%   Water balance: ${droughtData.waterBalance}mm   VPD: ${droughtData.vpd}kPa`, M+10, statsY);
+    y += dH+8;
+  }
+
+  // ── Zone breakdown ────────────────────────────────────────────────────────
+  y = checkPage(y, 60, doc);
+  y = sectionHeader('ZONE-BY-ZONE BREAKDOWN', y);
+
+  r.zones.forEach(z => {
+    const zrgb = z.score>=70?CRIT:z.score>=45?MOD:LOW;
+    const findLines = doc.splitTextToSize(z.findings||'', CW-58);
+    const zH = Math.max(44, findLines.length*9+20);
+    y = checkPage(y, zH+6, doc);
+
+    doc.setFillColor(...LIGHT); doc.roundedRect(M,y,CW,zH,4,4,'F');
+    // Score badge
+    doc.setFillColor(...zrgb); doc.roundedRect(W-M-38,y+8,30,20,3,3,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
+    doc.text(String(z.score), W-M-23, y+22, {align:'center'});
+    // Zone title
+    doc.setTextColor(...DARK); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text(`${z.zone}  (${z.range})`, M+8, y+15);
+    // Status tag
+    doc.setFontSize(7); doc.setTextColor(...zrgb);
+    doc.text(z.status.toUpperCase(), M+8, y+24);
+    // Findings text — full wrap
+    doc.setTextColor(...MUTED); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    findLines.forEach((l,i) => doc.text(l, M+8, y+33+i*9));
+    // Progress bar
+    const barY = y+zH-6;
+    doc.setFillColor(220,215,208); doc.roundedRect(M+8,barY,CW-48,3,1,1,'F');
+    doc.setFillColor(...zrgb); doc.roundedRect(M+8,barY,Math.round((CW-48)*z.score/100),3,1,1,'F');
+    y += zH+8;
   });
 
-  // ── Fuel conditions page ─────────────────────────────────────────────────
+  // ── Key findings ──────────────────────────────────────────────────────────
+  y = checkPage(y, 50, doc);
+  y = sectionHeader('KEY FINDINGS', y);
+
+  r.keyFindings.forEach(f => {
+    const prgb = priorityRgb(f.priority);
+    const findLines = doc.splitTextToSize(f.finding||'', CW-70);
+    const detLines = doc.splitTextToSize(f.detail||'', CW-70);
+    const fH = Math.max(28, (findLines.length+detLines.length)*8+14);
+    y = checkPage(y, fH+6, doc);
+
+    // Priority badge
+    doc.setFillColor(...prgb); doc.roundedRect(M,y+3,52,13,3,3,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+    doc.text(f.priority.toUpperCase(), M+26, y+12, {align:'center'});
+    // Finding text
+    doc.setTextColor(...DARK); doc.setFontSize(8); doc.setFont('helvetica','bold');
+    findLines.forEach((l,i) => doc.text(l, M+58, y+10+i*9));
+    // Detail text
+    doc.setTextColor(...MUTED); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    const detY = y+10+findLines.length*9;
+    detLines.forEach((l,i) => doc.text(l, M+58, detY+i*8.5));
+    y += fH+6;
+  });
+
+  // ── Recommendations ───────────────────────────────────────────────────────
+  y = checkPage(y, 50, doc);
+  y = sectionHeader('RECOMMENDED ACTIONS', y);
+
+  r.recommendations.forEach(rec => {
+    const prgb = priorityRgb(rec.priority);
+    const actLines = doc.splitTextToSize(rec.action||'', CW-70);
+    const ratLines = doc.splitTextToSize(rec.rationale||'', CW-70);
+    const rH = Math.max(28, (actLines.length+ratLines.length)*8+14);
+    y = checkPage(y, rH+6, doc);
+
+    doc.setFillColor(...prgb); doc.roundedRect(M,y+3,52,13,3,3,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+    doc.text(rec.priority.toUpperCase(), M+26, y+12, {align:'center'});
+    doc.setTextColor(...DARK); doc.setFontSize(8); doc.setFont('helvetica','bold');
+    actLines.forEach((l,i) => doc.text(l, M+58, y+10+i*9));
+    doc.setTextColor(...MUTED); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    const ratY = y+10+actLines.length*9;
+    ratLines.forEach((l,i) => doc.text(l, M+58, ratY+i*8.5));
+    y += rH+6;
+  });
+
+  // ── Disclaimer ─────────────────────────────────────────────────────────────
+  y = checkPage(y, 40, doc);
+  y += 6;
+  const discText = 'This audit is a preliminary screening tool based on aerial imagery and modeled fuel conditions. Findings must be verified by on-site inspection before use in underwriting decisions. Not a substitute for a certified wildfire risk assessment. Document image source and audit date in the RC file.';
+  const discLines = doc.splitTextToSize(discText, CW-16);
+  doc.setFillColor(245,243,238); doc.roundedRect(M,y,CW,discLines.length*9+12,4,4,'F');
+  doc.setTextColor(...MUTED); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+  discLines.forEach((l,i) => doc.text(l, M+8, y+10+i*9));
+  y += discLines.length*9+18;
+
+  // ── Page footer (all pages get it via loop) ────────────────────────────────
+  const pageCount = doc.getNumberOfPages();
+  for (let i=1; i<=pageCount; i++) {
+    doc.setPage(i);
+    if (i > 1) continue; // fuel page gets its own footer below
+    doc.setFillColor(...DARK); doc.rect(0,748,W,44,'F');
+    doc.setTextColor(160,150,140); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    doc.text('AMERIND Risk — Defensible Space Audit — For risk control use only', M, 768);
+    doc.text(`${timestamp.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}  ·  Page ${i} of ${pageCount}`, W-M, 768, {align:'right'});
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FUEL CONDITIONS PAGE
+  // ═══════════════════════════════════════════════════════════════════════════
   if (currentResult.fuelData) {
-    doc.addPage(); y = 48;
+    doc.addPage();
     const fd = currentResult.fuelData;
-    doc.setFillColor(26,24,20);doc.rect(0,0,W,36,'F');
-    doc.setFillColor(196,66,10);doc.rect(0,0,5,36,'F');
-    doc.setTextColor(255,255,255);doc.setFontSize(13);doc.setFont('helvetica','bold');
-    doc.text('Current Season Fuel Conditions Report',M,20);
-    doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(160,150,140);
-    doc.text(`${fd.seasonLabel} · ${fd.timestamp} · Source: Open-Meteo 90-day history, NFDRS methodology`,M,32);
-    y = 52;
 
-    // Dead fuel moisture section
-    doc.setTextColor(100,96,92);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('DEAD FUEL MOISTURE ESTIMATES',M,y);
-    doc.setDrawColor(210,205,198);doc.line(M,y+4,W-M,y+4);y+=12;
-    const fmCols = [
-      {label:'1-Hour FM',val:fd.fm1hr+'%',sub:fd.fm1Rating.label,col:fd.fm1Rating.color,note:'Primary ignition indicator'},
-      {label:'10-Hour FM',val:fd.fm10hr+'%',sub:fd.fm10hr<=10?'Critical':fd.fm10hr<=15?'High':'Moderate',col:fd.fm10hr<=10?'#8b0000':fd.fm10hr<=15?'#c4420a':'#b07a00',note:'Sustained burning indicator'},
-      {label:'100-Hour FM',val:fd.fm100hr+'%',sub:fd.fm100hr<=20?'High':fd.fm100hr<=25?'Moderate':'Low',col:fd.fm100hr<=20?'#c4420a':fd.fm100hr<=25?'#b07a00':'#2d6a2d',note:'Fire behavior intensity'},
-      {label:'Live Grass FM',val:fd.liveGrassMoisture+'%',sub:fd.liveGrassMoisture<=60?'Cured':fd.liveGrassMoisture<=100?'Transitioning':'Green',col:fd.liveGrassMoisture<=60?'#8b0000':fd.liveGrassMoisture<=100?'#b07a00':'#2d6a2d',note:'Seasonal curing state'},
+    // Header
+    doc.setFillColor(...DARK); doc.rect(0,0,W,50,'F');
+    doc.setFillColor(...NAVY); doc.rect(0,0,4,50,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(14); doc.setFont('helvetica','bold');
+    doc.text('Current Season Fuel Conditions Report', M, 22);
+    doc.setFontSize(8); doc.setFont('helvetica','normal');
+    doc.text(`${fd.seasonLabel}  ·  ${fd.timestamp}  ·  Source: Open-Meteo 90-day history, NFDRS methodology`, M, 36);
+    doc.setTextColor(160,150,140); doc.setFontSize(7.5);
+    doc.text(address||'', W-M, 36, {align:'right'});
+
+    y = 62;
+
+    // ── Dead fuel moisture ─────────────────────────────────────────────────
+    y = sectionHeader('DEAD FUEL MOISTURE ESTIMATES', y);
+    const fmItems = [
+      {label:'1-Hour Fuel Moisture',val:fd.fm1hr+'%',rating:fd.fm1Rating.label,col:fd.fm1Rating.color,desc:'Primary ignition indicator. Critical at or below 4%.'},
+      {label:'10-Hour Fuel Moisture',val:fd.fm10hr+'%',rating:fd.fm10hr<=10?'Critical':fd.fm10hr<=15?'High':'Moderate',col:fd.fm10hr<=10?'#8b0000':fd.fm10hr<=15?'#c4420a':'#b07a00',desc:'Sustained burning indicator. Critical at or below 10%.'},
+      {label:'100-Hour Fuel Moisture',val:fd.fm100hr+'%',rating:fd.fm100hr<=20?'High':fd.fm100hr<=25?'Moderate':'Low',col:fd.fm100hr<=20?'#c4420a':fd.fm100hr<=25?'#b07a00':'#2d6a2d',desc:'Fire behavior intensity driver. High at or below 20%.'},
+      {label:'Live Grass Fuel Moisture',val:fd.liveGrassMoisture+'%',rating:fd.liveGrassMoisture<=60?'Cured':fd.liveGrassMoisture<=100?'Transitioning':'Green',col:fd.liveGrassMoisture<=60?'#8b0000':fd.liveGrassMoisture<=100?'#b07a00':'#2d6a2d',desc:'Seasonal curing state. Cured grass at or below 60%.'},
     ];
-    const colW = Math.round(CW/4);
-    fmCols.forEach((c,i) => {
-      const x = M + i*colW;
-      const rgb = c.col==='#8b0000'?[139,0,0]:c.col==='#c4420a'?[196,66,10]:c.col==='#b07a00'?[176,122,0]:[45,106,45];
-      doc.setFillColor(248,246,242);doc.roundedRect(x,y,colW-4,46,3,3,'F');
-      doc.setTextColor(...rgb);doc.setFontSize(18);doc.setFont('helvetica','bold');doc.text(c.val,x+8,y+20);
-      doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text(c.sub,x+8,y+32);
-      doc.setTextColor(120,115,108);doc.setFontSize(7);doc.setFont('helvetica','normal');doc.text(c.label,x+8,y+42);
+    const fmColW = Math.floor(CW/4)-3;
+    fmItems.forEach((c,i) => {
+      const x = M + i*(fmColW+4);
+      const rgb = hexRgb(c.col);
+      const descLines = doc.splitTextToSize(c.desc, fmColW-10);
+      const cellH = 52 + descLines.length*8;
+      doc.setFillColor(...LIGHT); doc.roundedRect(x,y,fmColW,cellH,3,3,'F');
+      doc.setFillColor(...rgb); doc.roundedRect(x,y,fmColW,4,2,2,'F');
+      doc.setTextColor(...rgb); doc.setFontSize(20); doc.setFont('helvetica','bold');
+      doc.text(c.val, x+8, y+22);
+      doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+      doc.text(c.rating, x+8, y+32);
+      doc.setTextColor(...DARK); doc.setFontSize(7); doc.setFont('helvetica','bold');
+      doc.text(c.label, x+8, y+42);
+      doc.setTextColor(...MUTED); doc.setFont('helvetica','normal');
+      descLines.forEach((l,j) => doc.text(l, x+8, y+52+j*8));
     });
-    y += 56;
+    y += 72;
 
-    // Fire danger indices
-    doc.setTextColor(100,96,92);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('FIRE DANGER INDICES',M,y);
-    doc.line(M,y+4,W-M,y+4);y+=12;
-    const idxCols = [
-      {label:'ERC (Energy Release Component)',val:String(fd.erc),sub:fd.ercRating.label+' (0–100)',col:fd.ercRating.color,desc:'Fire suppression difficulty and fuel consumption rate. Critical above 60.'},
-      {label:'KBDI (Keetch-Byram Drought Index)',val:String(fd.kbdi),sub:fd.kbdiRating.label+' (0–800)',col:fd.kbdiRating.color,desc:'Soil and deep fuel moisture deficit. High fire potential above 400.'},
-      {label:'FFWI (Fosberg Fire Weather Index)',val:String(fd.ffwi),sub:(fd.ffwi>=75?'Extreme':fd.ffwi>=50?'Very High':fd.ffwi>=25?'High':'Moderate')+' (0–100)',col:fd.ffwi>=75?'#8b0000':fd.ffwi>=50?'#c4420a':fd.ffwi>=25?'#b07a00':'#2d6a2d',desc:'Combined wind and fuel moisture fire weather index.'},
+    // ── Fire danger indices ────────────────────────────────────────────────
+    y = sectionHeader('FIRE DANGER INDICES', y);
+    const idxColW = Math.floor(CW/3)-3;
+    const idxItems = [
+      {label:'ERC — Energy Release Component',val:String(fd.erc),scale:'Scale 0–100',rating:fd.ercRating.label,col:fd.ercRating.color,desc:'Represents the potential energy release per unit area within the flaming front. Indicates fire suppression difficulty and intensity. Extreme fire danger above 60.'},
+      {label:'KBDI — Keetch-Byram Drought Index',val:String(fd.kbdi),scale:'Scale 0–800',rating:fd.kbdiRating.label,col:fd.kbdiRating.color,desc:'Measures soil and deep organic layer moisture deficit. High fire potential above 400. Values above 600 indicate conditions for extreme fire behavior in timber and deep litter fuels.'},
+      {label:'FFWI — Fosberg Fire Weather Index',val:String(fd.ffwi),scale:'Scale 0–100',rating:fd.ffwi>=75?'Extreme':fd.ffwi>=50?'Very High':fd.ffwi>=25?'High':'Moderate',col:fd.ffwi>=75?'#8b0000':fd.ffwi>=50?'#c4420a':fd.ffwi>=25?'#b07a00':'#2d6a2d',desc:'Combined wind speed and dead fuel moisture index. Reflects fire weather severity. Extreme fire weather above 75. Developed by Fosberg (1978) for NFDRS applications.'},
     ];
-    idxCols.forEach((c,i) => {
-      const x = M + i*(colW+6);
-      const rgb = c.col==='#8b0000'?[139,0,0]:c.col==='#c4420a'?[196,66,10]:c.col==='#b07a00'?[176,122,0]:[45,106,45];
-      doc.setFillColor(248,246,242);doc.roundedRect(x,y,colW+2,56,3,3,'F');
-      doc.setTextColor(...rgb);doc.setFontSize(22);doc.setFont('helvetica','bold');doc.text(c.val,x+8,y+22);
-      doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text(c.sub,x+8,y+34);
-      doc.setTextColor(120,115,108);doc.setFontSize(7);doc.setFont('helvetica','normal');
-      doc.text(c.label,x+8,y+44);
-      doc.text(doc.splitTextToSize(c.desc,colW-4)[0],x+8,y+53);
+    idxItems.forEach((c,i) => {
+      const x = M + i*(idxColW+4);
+      const rgb = hexRgb(c.col);
+      const descLines = doc.splitTextToSize(c.desc, idxColW-10);
+      const cellH = 60 + descLines.length*8;
+      doc.setFillColor(...LIGHT); doc.roundedRect(x,y,idxColW,cellH,3,3,'F');
+      doc.setFillColor(...rgb); doc.roundedRect(x,y,idxColW,4,2,2,'F');
+      doc.setTextColor(...rgb); doc.setFontSize(26); doc.setFont('helvetica','bold');
+      doc.text(c.val, x+8, y+28);
+      doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+      doc.text(c.rating+'  ·  '+c.scale, x+8, y+38);
+      doc.setTextColor(...DARK); doc.setFontSize(7); doc.setFont('helvetica','bold');
+      const lblLines = doc.splitTextToSize(c.label, idxColW-10);
+      lblLines.forEach((l,j) => doc.text(l, x+8, y+48+j*8));
+      doc.setTextColor(...MUTED); doc.setFont('helvetica','normal');
+      descLines.forEach((l,j) => doc.text(l, x+8, y+48+lblLines.length*8+4+j*8));
     });
-    y += 66;
+    y += 100;
 
-    // Vegetation and weather
-    doc.setTextColor(100,96,92);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('VEGETATION INDEX & WEATHER CONTEXT',M,y);
-    doc.line(M,y+4,W-M,y+4);y+=12;
-    doc.setFillColor(248,246,242);doc.roundedRect(M,y,CW,44,4,4,'F');
-    const wx = [
-      ['NDVI',fd.ndvi.toFixed(2)+' — '+fd.ndviRating.label],
-      ['7-day precip',fd.p7+'"'],['30-day precip',fd.p30+'"'],
-      ['Avg max temp',fd.avgTempF+'°F'],['Avg afternoon RH',fd.avgAfternoonRH+'%'],['Avg wind',fd.windMph+' mph'],
+    // ── NDVI ──────────────────────────────────────────────────────────────
+    y = sectionHeader('VEGETATION INDEX', y);
+    const ndviRgb = hexRgb(fd.ndviRating.color);
+    doc.setFillColor(...LIGHT); doc.roundedRect(M,y,CW,36,4,4,'F');
+    doc.setFillColor(...ndviRgb); doc.roundedRect(M,y,4,36,2,2,'F');
+    doc.setTextColor(...ndviRgb); doc.setFontSize(20); doc.setFont('helvetica','bold');
+    doc.text(fd.ndvi.toFixed(2), M+14, y+22);
+    doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text(fd.ndviRating.label, M+58, y+16);
+    doc.setTextColor(...MUTED); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    doc.text('NDVI (Normalized Difference Vegetation Index) — estimated from soil moisture and vapor pressure deficit proxy. Range: –0.1 (bare) to 0.9 (dense vegetation).', M+58, y+28, {maxWidth: CW-70});
+    y += 46;
+
+    // ── Weather context ────────────────────────────────────────────────────
+    y = sectionHeader('WEATHER CONTEXT (7-DAY AVERAGE)', y);
+    const wxItems = [
+      ['7-Day Precipitation',fd.p7+'"'],
+      ['30-Day Precipitation',fd.p30+'"'],
+      ['90-Day Precipitation',fd.p90+'"'],
+      ['Avg Max Temperature',fd.avgTempF+'°F'],
+      ['Avg Afternoon RH',fd.avgAfternoonRH+'%'],
+      ['Avg Max Wind Speed',fd.windMph+' mph'],
     ];
-    wx.forEach((w,i) => {
-      const col = i < 3 ? M + i*(CW/3) : M + (i-3)*(CW/3);
-      const row = i < 3 ? y+14 : y+36;
-      doc.setTextColor(120,115,108);doc.setFontSize(7);doc.setFont('helvetica','normal');doc.text(w[0],col+8,row-8);
-      doc.setTextColor(26,24,20);doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text(w[1],col+8,row);
+    const wxColW = Math.floor(CW/3)-3;
+    const wxRows = [[wxItems[0],wxItems[1],wxItems[2]],[wxItems[3],wxItems[4],wxItems[5]]];
+    wxRows.forEach((row,ri) => {
+      row.forEach((w,ci) => {
+        const x = M + ci*(wxColW+4);
+        const ry = y + ri*36;
+        doc.setFillColor(...LIGHT); doc.roundedRect(x,ry,wxColW,30,3,3,'F');
+        doc.setTextColor(...MUTED); doc.setFontSize(7); doc.setFont('helvetica','normal');
+        doc.text(w[0], x+8, ry+10);
+        doc.setTextColor(...DARK); doc.setFontSize(11); doc.setFont('helvetica','bold');
+        doc.text(w[1], x+8, ry+23);
+      });
     });
-    y += 54;
+    y += 80;
 
-    // Methodology note
-    doc.setFillColor(245,243,238);doc.roundedRect(M,y,CW,32,4,4,'F');
-    doc.setTextColor(140,130,120);doc.setFontSize(7);doc.setFont('helvetica','normal');
-    doc.text('METHODOLOGY: Dead fuel moisture estimated from 7-day afternoon RH/temperature per Nelson (1984). ERC from 100-hr FM and precip deficit.',M+8,y+10);
-    doc.text('KBDI from 90-day precip and temperature history. FFWI per Fosberg (1978). NDVI estimated from soil moisture and VPD proxy.',M+8,y+19);
-    doc.text('All values are modeled estimates — verify with nearest RAWS station for operational fire weather decisions.',M+8,y+28);
+    // ── Methodology ───────────────────────────────────────────────────────
+    const methText = 'METHODOLOGY: Dead fuel moisture estimated from 7-day afternoon relative humidity and maximum temperature per Nelson (1984). Energy Release Component (ERC) derived from 100-hour fuel moisture and 30-day precipitation deficit per NFDRS. Keetch-Byram Drought Index (KBDI) calculated from 90-day precipitation history and average maximum temperature. Fosberg Fire Weather Index (FFWI) computed per Fosberg (1978) from 1-hour fuel moisture and wind speed. NDVI estimated from soil moisture and vapor pressure deficit proxy data. Live grass fuel moisture estimated from afternoon relative humidity index. All values are modeled estimates derived from Open-Meteo historical weather API. Verify against the nearest Remote Automated Weather Station (RAWS) for operational fire weather decisions. Source: Open-Meteo · Nelson (1984) · Fosberg (1978) · NFDRS fire danger rating system.';
+    const methLines = doc.splitTextToSize(methText, CW-16);
+    const methH = methLines.length*8+14;
+    doc.setFillColor(245,243,238); doc.roundedRect(M,y,CW,methH,4,4,'F');
+    doc.setFillColor(...NAVY); doc.roundedRect(M,y,3,methH,1,1,'F');
+    doc.setTextColor(...MUTED); doc.setFontSize(7); doc.setFont('helvetica','normal');
+    methLines.forEach((l,i) => doc.text(l, M+10, y+10+i*8));
+    y += methH+10;
+
+    // Footer
+    doc.setFillColor(...DARK); doc.rect(0,748,W,44,'F');
+    doc.setTextColor(160,150,140); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    doc.text('AMERIND Risk — Defensible Space Audit — Fuel Conditions — For risk control use only', M, 768);
+    doc.text(timestamp.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}), W-M, 768, {align:'right'});
   }
 
-  doc.setFillColor(26,24,20);doc.rect(0,748,W,44,'F');
-  doc.setTextColor(160,150,140);doc.setFontSize(8);doc.setFont('helvetica','normal');
-  doc.text('AMERIND Risk — Defensible Space Audit — For risk control use only',M,768);
-  doc.text(timestamp.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),W-M,768,{align:'right'});
   doc.save(`AMERIND_DefensibleSpace_${(address||'location').replace(/[^a-z0-9]/gi,'_').substring(0,40)}.pdf`);
 }
 </script>
